@@ -40,6 +40,13 @@ alter table collector_runs enable row level security;
 create policy "public read active jobs" on jobs
   for select using (is_active = true);
 
+-- Data API 권한을 Supabase 기본값에 기대지 않고 명시한다.
+-- 공개 사용자(anon, authenticated)는 jobs 읽기만 가능하고(행은 위 정책이 활성 공고로 제한),
+-- 쓰기는 수집기가 쓰는 service_role만 한다. collector_runs는 service_role 외에는 접근할 수 없다.
+grant select on jobs to anon, authenticated;
+grant select, insert, update, delete on jobs to service_role;
+grant select, insert, update, delete on collector_runs to service_role;
+
 -- 피드 조회: 같은 공고를 한 카드로 묶고 최신 등록순으로 돌려준다.
 --
 -- * 마감일이 지난 공고, 마감일이 없고 최초 수집 후 30일이 지난 공고는 is_active와 상관없이 숨긴다.

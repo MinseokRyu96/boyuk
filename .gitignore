@@ -40,3 +40,7 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# Supabase 키 등 비밀 값을 적어 둔 파일은 올리지 않는다
+supabase/*key*
+supabase/*.rtf

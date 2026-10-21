@@ -58,10 +58,11 @@ async function feed(limit = 100, cursor?: { at: Date; key: string }) {
 
 beforeAll(async () => {
   db = new PGlite();
-  // Supabase에 기본으로 있는 역할을 흉내 낸다
-  await db.exec(`create role anon nologin; create role authenticated nologin; create role service_role nologin;`);
+  // Supabase에 기본으로 있는 역할을 흉내 낸다. service_role은 행 단위 보안을 우회한다
+  await db.exec(`create role anon nologin; create role authenticated nologin; create role service_role nologin bypassrls;`);
   await db.exec(readFileSync(join(__dirname, "migrations/0001_init.sql"), "utf8"));
-  await db.exec(`grant usage on schema public to anon; grant select on jobs to anon, authenticated;`);
+  // 스키마 사용 권한만 Supabase 기본값을 흉내 낸다. 테이블 권한은 마이그레이션 SQL이 스스로 부여해야 한다
+  await db.exec(`grant usage on schema public to anon, authenticated, service_role;`);
 
   // 같은 공고: 고용24 A와 서울센터 B가 같은 dedupe_key. 같은 고용24의 C도 같은 키지만 다른 공고다.
   const week = await kstDay(5);
@@ -160,5 +161,24 @@ describe("권한과 마감 처리", () => {
     const minutes = (Date.now() - rows[0].t.getTime()) / 60000;
     expect(minutes).toBeGreaterThan(11);
     expect(minutes).toBeLessThan(13);
+  });
+
+  it("anon은 jobs를 읽기만 하고 쓸 수 없다", async () => {
+    await db.exec(`set role anon`);
+    await expect(db.query(`insert into jobs (source, source_id, title, url) values ('x', 'x', 'x', 'https://x')`)).rejects.toThrow();
+    await expect(db.query(`update jobs set title = 'x'`)).rejects.toThrow();
+    await expect(db.query(`delete from jobs`)).rejects.toThrow();
+  });
+
+  it("service_role은 jobs·collector_runs에 쓰고 마감 처리 함수를 실행할 수 있다 (수집기가 쓰는 권한)", async () => {
+    await db.exec(`reset role`);
+    await db.exec(`set role service_role`);
+    await db.query(`insert into jobs (source, source_id, title, url) values ('work24', 'SR1', '신입 담임', 'https://x/SR1')`);
+    await db.query(`update jobs set title = '수정' where source_id = 'SR1'`);
+    await db.query(`insert into collector_runs (source, status) values ('work24', 'success')`);
+    const { rows } = await db.query<{ n: number }>(`select deactivate_expired_jobs() as n`);
+    expect(rows[0].n).toBeGreaterThanOrEqual(0);
+    await db.exec(`reset role`);
+    await db.exec(`set role anon`);
   });
 });

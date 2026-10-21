@@ -28,7 +28,9 @@ export async function GET(request: Request, ctx: RouteContext<"/api/cron/[source
   }
 
   const result = await runCollector(collector);
-  // 새 공고가 바로 보이도록 첫 페이지 캐시를 오래된 것으로 표시한다
-  revalidateTag(FEED_TAG, "max");
+  // 새 공고가 바로 보이도록 첫 화면 캐시를 즉시 무효화한다.
+  // "max"는 갱신이 끝날 때까지 오래된 화면을 먼저 내줘서, 수집 직후 첫 방문자가 이전 데이터를 보게 된다(실제로 재현했다).
+  // expire: 0이면 다음 요청이 새로 만든 화면을 받는다. 실패한 수집은 DB를 바꾸지 않았으므로 캐시를 건드리지 않는다.
+  if (result.status === "success") revalidateTag(FEED_TAG, { expire: 0 });
   return Response.json(result, { status: result.status === "success" ? 200 : 502 });
 }
