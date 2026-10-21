@@ -51,3 +51,14 @@ export function isTarget(job: RawJob): boolean {
   const rawText = clean(job.rawText);
   return matchesCareer(job, `${title} ${rawText}`) && matchesDuty(title, rawText);
 }
+
+/** 어린이집 맥락을 알려 주는 단어. "유치원"과 "학원"은 일부러 넣지 않았다 (PRD 대상은 어린이집이다) */
+const CHILDCARE = /어린이집|보육|영유아/;
+
+/**
+ * 어린이집 공고가 맞는가. 범용 채용 소스(고용24·사람인)는 학원·학교의 "담임교사" 공고도 함께 주므로
+ * 제목·기관명·업종·직무 분류 중 어디에든 어린이집·보육·영유아가 있어야 통과시킨다.
+ */
+export function isChildcareContext(job: RawJob): boolean {
+  return CHILDCARE.test([job.title, job.orgName, job.contextText, job.rawText].filter(Boolean).join(" "));
+}

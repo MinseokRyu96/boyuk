@@ -13,6 +13,9 @@ export function kstToday(now: Date): string {
   return kstDateFormat.format(now);
 }
 
+/** 임의의 시각을 한국 시간 기준 날짜 'YYYY-MM-DD'로 바꾼다 */
+export const kstDate = kstToday;
+
 function dateOnlyToUtcMs(date: string): number {
   const [y, m, d] = date.split("-").map(Number);
   return Date.UTC(y, m - 1, d);

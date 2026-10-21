@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { RawJob } from "./collectors/types";
-import { isTarget } from "./normalize";
+import { isChildcareContext, isTarget } from "./normalize";
 
 const job = (title: string, extra: Partial<RawJob> = {}): RawJob => ({
   sourceId: "1",
@@ -76,5 +76,20 @@ describe("isTarget — 직무 판별", () => {
 
   it("담임·보육교사라고 쓰지 않았어도 교사를 구하면 저장한다", () => {
     expect(isTarget(job("어린이집 교사 모집 신입"))).toBe(true);
+  });
+});
+
+describe("isChildcareContext — 범용 채용 소스의 학원·학교 공고를 거른다", () => {
+  it("제목·기관명·업종·직무 분류 어디에든 어린이집·보육·영유아가 있으면 통과한다", () => {
+    expect(isChildcareContext(job("해오름어린이집 담임교사 모집"))).toBe(true);
+    expect(isChildcareContext(job("담임교사 모집", { orgName: "별빛어린이집" }))).toBe(true);
+    expect(isChildcareContext(job("담임교사 모집", { contextText: "영유아 보육시설" }))).toBe(true);
+    expect(isChildcareContext(job("담임교사 모집", { rawText: "신입 보육교사" }))).toBe(true);
+  });
+
+  it("학원·학교·유치원의 담임교사는 어린이집이 아니므로 거른다", () => {
+    expect(isChildcareContext(job("초등부 담임교사 모집 (신입 가능)", { orgName: "스마일학원", contextText: "학원" }))).toBe(false);
+    expect(isChildcareContext(job("담임교사 채용", { orgName: "햇살초등학교" }))).toBe(false);
+    expect(isChildcareContext(job("유치원 담임교사 모집", { orgName: "숲유치원" }))).toBe(false);
   });
 });

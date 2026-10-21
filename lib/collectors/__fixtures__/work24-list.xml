@@ -1,0 +1,99 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  [샘플] 고용24 채용정보 목록 API의 응답 모양 시험용 데이터. 실제 공고가 아니다.
+  태그 이름은 공식 명세(출력결과 표)를 따랐다. 명세에는 값의 예시가 없어서 아래는 제가 가정한 값이다:
+    - regDt / closeDt: "25-10-31"(두 자리 연도), "2025-10-02", "채용시까지"를 섞어 두었다
+    - career: "신입", "관계없음", "경력"
+    - region: "서울 강서구" 형태
+  키를 발급받아 실제 응답을 받으면 이 파일을 실제 모양에 맞춰 고친다.
+-->
+<wantedRoot>
+  <total>7</total>
+  <startPage>1</startPage>
+  <display>100</display>
+  <wanted>
+    <wantedAuthNo>K150012510010001</wantedAuthNo>
+    <company>해오름어린이집</company>
+    <busino>1234567890</busino>
+    <indTpNm>어린이집</indTpNm>
+    <title>[신입 가능] 만 1세반 담임교사 모집</title>
+    <salTpNm>월급</salTpNm>
+    <sal>월 2,300,000원</sal>
+    <minSal>2300000</minSal>
+    <maxSal>2300000</maxSal>
+    <region>서울 강서구</region>
+    <holidayTpNm>주5일근무</holidayTpNm>
+    <minEdubg>전문대졸</minEdubg>
+    <maxEdubg>대졸(4년제)</maxEdubg>
+    <career>신입</career>
+    <regDt>25-10-01</regDt>
+    <closeDt>25-10-31</closeDt>
+    <infoSvc>VALIDATION</infoSvc>
+    <wantedInfoUrl>https://www.work24.go.kr/wk/a/b/1500/empDetailAuthView.do?wantedAuthNo=K150012510010001&amp;infoTypeCd=VALIDATION&amp;infoTypeGroup=tb_workinfoworknet</wantedInfoUrl>
+    <wantedMobileInfoUrl>https://m.work24.go.kr/wk/a/b/1500/empDetailAuthView.do?wantedAuthNo=K150012510010001</wantedMobileInfoUrl>
+    <zipCd>07500</zipCd>
+    <strtnmCd>1</strtnmCd>
+    <basicAddr>서울특별시 강서구 화곡로 1</basicAddr>
+    <detailAddr>1층</detailAddr>
+    <empTpCd>10</empTpCd>
+    <jobsCd>0123</jobsCd>
+    <smodifyDtm>20251001093000</smodifyDtm>
+  </wanted>
+  <wanted>
+    <wantedAuthNo>K150012510020002</wantedAuthNo>
+    <company>푸르니 별빛어린이집</company>
+    <indTpNm>어린이집</indTpNm>
+    <title><![CDATA[보육교사 채용 (경력 무관) & 4대보험]]></title>
+    <region>서울 마포구</region>
+    <career>관계없음</career>
+    <regDt>2025-10-02</regDt>
+    <closeDt>채용시까지</closeDt>
+    <wantedInfoUrl>https://www.work24.go.kr/wk/a/b/1500/empDetailAuthView.do?wantedAuthNo=K150012510020002</wantedInfoUrl>
+    <basicAddr>서울특별시 마포구 월드컵로 2</basicAddr>
+  </wanted>
+  <wanted>
+    <wantedAuthNo>K150012510030003</wantedAuthNo>
+    <company>달빛어린이집</company>
+    <indTpNm>어린이집</indTpNm>
+    <title>담임교사 모집 (경력 3년 이상)</title>
+    <region>경기 성남시</region>
+    <career>경력</career>
+    <regDt>25-10-03</regDt>
+    <closeDt>25-11-15</closeDt>
+    <wantedInfoUrl>https://www.work24.go.kr/wk/a/b/1500/empDetailAuthView.do?wantedAuthNo=K150012510030003</wantedInfoUrl>
+  </wanted>
+  <wanted>
+    <wantedAuthNo>K150012510040004</wantedAuthNo>
+    <company>A&amp;B 어린이집</company>
+    <indTpNm>어린이집</indTpNm>
+    <title>조리원 모집 경력무관</title>
+    <career>관계없음</career>
+    <basicAddr>경기도 수원시 영통구 광교로 3</basicAddr>
+    <closeDt>25-10-25</closeDt>
+    <wantedInfoUrl>https://www.work24.go.kr/wk/a/b/1500/empDetailAuthView.do?wantedAuthNo=K150012510040004</wantedInfoUrl>
+  </wanted>
+  <wanted>
+    <wantedAuthNo>K150012510050005</wantedAuthNo>
+    <company>스마일학원</company>
+    <indTpNm>학원</indTpNm>
+    <title>초등부 담임교사 모집 (신입 가능)</title>
+    <region>서울 양천구</region>
+    <career>신입</career>
+    <closeDt>25-11-01</closeDt>
+    <wantedInfoUrl>https://www.work24.go.kr/wk/a/b/1500/empDetailAuthView.do?wantedAuthNo=K150012510050005</wantedInfoUrl>
+  </wanted>
+  <wanted>
+    <wantedAuthNo>K150012510060006</wantedAuthNo>
+    <company>링크없는어린이집</company>
+    <title>보육교사 모집</title>
+    <career>신입</career>
+  </wanted>
+  <wanted>
+    <wantedAuthNo>K150012510070007</wantedAuthNo>
+    <company>위험링크어린이집</company>
+    <indTpNm>어린이집</indTpNm>
+    <title>담임교사 모집 신입</title>
+    <career>신입</career>
+    <wantedInfoUrl>javascript:alert(1)</wantedInfoUrl>
+  </wanted>
+</wantedRoot>
