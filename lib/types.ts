@@ -21,8 +21,8 @@ export type SourceBadge = { code: string; label: string };
 export type FeedCard = {
   key: string;
   orgName: string;
-  /** 로고 대신 보여주는 어린이집 타일 */
-  avatar: { initial: string; tone: number };
+  /** 로고 대신 아바타에 보여주는 어린이집 이름의 첫 글자 */
+  initial: string;
   title: string;
   region: string | null;
   dDay: { label: string; level: DDayLevel };

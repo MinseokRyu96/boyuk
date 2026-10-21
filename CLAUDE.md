@@ -20,3 +20,14 @@
 - `SUPABASE_URL`·`SUPABASE_ANON_KEY`가 없으면 피드는 샘플 데이터(`lib/sample-jobs.ts`)로 동작하고 화면에 안내가 뜬다.
 - PRD와 다르게 한 곳: 같은 출처의 서로 다른 공고는 합치지 않고(출처별 순번으로 묶음), 커서는 `(first_seen_at, group_key)` 쌍이며, 마감일이 없으면 `dedupe_key`가 null이다. D-day 칩은 카드 오른쪽 위에 두고 오늘 마감은 "오늘마감"으로 쓴다.
 - Tailwind 새 클래스가 개발 서버에서 안 보이면 서버를 다시 띄운다(운영 빌드에는 영향 없음).
+
+## SEED Design
+
+UI는 SEED Design(React, Tailwind 4 테마)을 쓴다. 공식 문서는 `seed-design` 스킬로 읽는다.
+
+- `seed-design/ui/*`는 CLI가 만든 스니펫이라 직접 고치지 않고 린트에서도 뺐다. 컴포넌트 추가는 `npx @seed-design/cli@latest add ui:<이름>`이다.
+- 브랜드 색은 SEED의 carrot(주황) 팔레트 10개를 `app/globals.css`에서 청록으로 덮어쓴 것이다. 밝은 테마 전용이다.
+- `next.config.ts`의 `resolveAlias`가 SEED recipe를 `@layer` 버전으로 연결한다(Turbopack에는 SEED의 `seed-layered` 조건 옵션이 없다). 이게 있어야 Tailwind 클래스로 SEED 컴포넌트를 덮어쓸 수 있다. SEED를 올릴 때 이 연결이 아직 맞는지 확인한다.
+- 간격 토큰 클래스 중 `p-x4`, `gap-x3`, `mt-x2`는 되지만 `bottom-x5` 같은 inset 클래스는 없다. 그럴 땐 Tailwind 기본 값(`bottom-5`)을 쓴다.
+- SEED 기본 조합 중 PRD 대비 기준(4.5:1)에 못 미치는 것을 고쳐 썼다: `critical` solid 뱃지(흰 글자 3.76:1)는 `bg-palette-red-800`으로 덮어썼고, TagGroup은 `tone="neutral"`을 쓴다(기본 `neutralSubtle`은 3.42:1). Badge는 `size="large"`(12px)를 쓴다. 새 조합을 쓸 때는 실제 색으로 대비를 잰다.
+- SEED 컴포넌트의 기본 크기는 터치 영역 기준(44px)보다 작은 것이 있다(맨 위로 버튼 36px, 기본 크기 ActionButton 40px). 눌러야 하는 것은 `min-h-11`이나 `size="large"`로 44px 이상으로 맞춘다.

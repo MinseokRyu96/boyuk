@@ -92,11 +92,11 @@ export function Feed({ initial }: { initial: FeedPage }) {
 
   return (
     <>
-      <div className="flex items-baseline justify-between px-4 pt-5">
-        <h2 className="text-[18px] font-extrabold tracking-tight text-ink">최신 공고</h2>
-        <span className="text-[14px] text-ink-soft">등록 최신순</span>
+      <div className="flex items-baseline justify-between px-x4 pt-x5">
+        <h2 className="t6-bold text-fg-neutral">최신 공고</h2>
+        <span className="t4-regular text-fg-neutral-muted">등록 최신순</span>
       </div>
-      <ul className="flex flex-col gap-3 px-4 pb-4 pt-3">
+      <ul className="flex flex-col gap-x3 px-x4 pb-x4 pt-x3">
         {cards.map((card) => (
           <li key={card.key}>
             <JobCard card={card} />
@@ -114,7 +114,7 @@ export function Feed({ initial }: { initial: FeedPage }) {
         <RetryNotice title="다음 공고를 불러오지 못했어요" description="네트워크를 확인하고 다시 시도해 주세요." onRetry={loadMore} />
       )}
       {cursor === null && (
-        <p className="px-4 pb-6 text-center text-[14px] text-ink-soft">모든 공고를 확인했어요</p>
+        <p className="t4-regular px-x4 pb-x6 text-center text-fg-neutral-muted">모든 공고를 확인했어요</p>
       )}
       {/* 이 요소가 화면 가까이 오면 다음 페이지를 요청한다 */}
       <div ref={sentinel} aria-hidden="true" className="h-px" />

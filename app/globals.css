@@ -1,43 +1,30 @@
+/* SEED CSS와 Tailwind의 우선순위: 뒤에 있을수록 높다. utilities가 seed-components보다 높아야 Tailwind 클래스로 SEED 컴포넌트를 덮어쓸 수 있다 */
+@layer theme, base, seed-base, components, seed-components, utilities;
+@import "@seed-design/css/base.layered.css";
 @import "tailwindcss";
+@import "@seed-design/tailwind4-theme";
 
 /*
- * 색 대비는 본문 4.5:1 이상을 기준으로 골랐다 (PRD 8장).
- * 밝은 테마만 지원한다. 어두운 테마는 MVP 범위가 아니다.
+ * 브랜드 색: SEED의 carrot(주황) 팔레트 10개를 청록으로 덮어쓴다.
+ * fg.brand, bg.brand-solid 같은 브랜드 역할 토큰 8개가 이 팔레트만 참조하므로 SEED 컴포넌트의 브랜드 색이 한 번에 바뀐다.
+ * 단계별 색 대비를 확인했다: 흰 글자 / 600 = 6.41:1, 700 글자 / 100 배경 = 7.57:1.
+ * 밝은 테마 전용이다. 어두운 테마를 켜려면 같은 이름의 변수를 어두운 테마 선택자에도 덮어써야 한다.
+ * 선택자는 SEED 라이트 모드 선택자와 같게 맞춰 우선순위에서 밀리지 않게 했다.
  */
-@theme {
-  --color-canvas: #ebe6dd;
-  --color-surface: #faf8f4;
-  --color-card: #ffffff;
-  --color-line: #e4ded3;
-  --color-ink: #1c2826;
-  --color-ink-soft: #52605d;
-  --color-brand: #0b6b5d;
-  --color-brand-soft: #e6f1ee;
-  --color-urgent: #b3261e;
-  --color-urgent-soft: #fce8e6;
-  --color-chip: #edf0ef;
-  --color-new-bg: #ffe8b3;
-  --color-new-ink: #6b3f00;
-  --color-workplace-bg: #e4eaff;
-  --color-workplace-ink: #2a3f9e;
-
-  /*
-   * 어린이집 타일 색 (lib/avatar.ts의 AVATAR_TONE_COUNT와 개수를 맞춘다).
-   * 칩이 의미로 쓰는 색(빨강=마감 임박, 노랑=NEW, 남색=직장, 초록=출처)은 피해서 섞여 보이지 않게 한다.
-   */
-  --color-tone-sky-bg: #ddf1fa;
-  --color-tone-sky-ink: #0b5878;
-  --color-tone-violet-bg: #eee7fb;
-  --color-tone-violet-ink: #5b33a6;
-  --color-tone-lime-bg: #eaf3d3;
-  --color-tone-lime-ink: #3f5a0a;
-  --color-tone-slate-bg: #e6eaee;
-  --color-tone-slate-ink: #3b4753;
-  --color-tone-mocha-bg: #f1e8df;
-  --color-tone-mocha-ink: #5e4630;
-
-  --font-sans: -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", "Pretendard", "Noto Sans KR",
-    "Malgun Gothic", system-ui, sans-serif;
+:root,
+:root[data-seed-color-mode="system"][data-seed-user-color-scheme="light"],
+:root[data-seed-color-mode="light-only"],
+:root [data-seed-color-mode="light-only"] {
+  --seed-color-palette-carrot-100: #e6f1ee;
+  --seed-color-palette-carrot-200: #d2e6e0;
+  --seed-color-palette-carrot-300: #a9d0c6;
+  --seed-color-palette-carrot-400: #74b4a6;
+  --seed-color-palette-carrot-500: #3d9585;
+  --seed-color-palette-carrot-600: #0b6b5d;
+  --seed-color-palette-carrot-700: #085548;
+  --seed-color-palette-carrot-800: #064238;
+  --seed-color-palette-carrot-900: #04312a;
+  --seed-color-palette-carrot-1000: #021f1a;
 }
 
 :root {
@@ -48,11 +35,11 @@
 @keyframes pill-in {
   from {
     opacity: 0;
-    transform: translate(-50%, 8px);
+    transform: translateY(8px);
   }
   to {
     opacity: 1;
-    transform: translate(-50%, 0);
+    transform: translateY(0);
   }
 }
 
@@ -67,11 +54,11 @@
 }
 
 body {
-  background: var(--color-canvas);
-  color: var(--color-ink);
-  font-family: var(--font-sans);
-  font-size: 15px;
-  line-height: 1.5;
+  background: var(--seed-color-bg-layer-basement);
+  color: var(--seed-color-fg-neutral);
+  font-family: var(--seed-font-family);
+  font-size: var(--seed-font-size-t4);
+  line-height: var(--seed-line-height-t4);
   /* 한글은 단어 중간에서 줄을 바꾸지 않고, 공백 없이 긴 문자열만 어디서든 끊는다 */
   word-break: keep-all;
   overflow-wrap: anywhere;

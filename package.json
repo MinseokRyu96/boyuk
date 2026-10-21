@@ -11,6 +11,10 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@karrotmarket/react-monochrome-icon": "^1.30.0",
+    "@seed-design/css": "^3.0.3",
+    "@seed-design/react": "^3.0.0",
+    "@seed-design/tailwind4-theme": "^3.0.2",
     "@supabase/supabase-js": "^2.118.0",
     "next": "16.4.2",
     "react": "19.3.0",

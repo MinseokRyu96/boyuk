@@ -10,7 +10,7 @@ export default function Error({ error, retry }: { error: Error & { digest?: stri
   }, [error]);
 
   return (
-    <div className="mx-auto flex min-h-dvh w-full max-w-[480px] flex-col justify-center bg-surface">
+    <div className="mx-auto flex min-h-dvh w-full max-w-[480px] flex-col justify-center bg-bg-layer-default">
       <RetryNotice title="공고를 불러오지 못했어요" description="잠시 후 다시 시도해 주세요." onRetry={retry} />
     </div>
   );

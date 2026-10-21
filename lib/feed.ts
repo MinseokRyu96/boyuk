@@ -1,4 +1,4 @@
-import { avatarOf } from "./avatar";
+import { avatarInitial } from "./avatar";
 import { dDay, isNewPosting } from "./time";
 import { sortSources, sourceLabel } from "./sources";
 import type { FeedCard, FeedRow } from "./types";
@@ -11,7 +11,7 @@ export function toCard(row: FeedRow, now: Date): FeedCard {
   return {
     key: row.group_key,
     orgName,
-    avatar: avatarOf(orgName),
+    initial: avatarInitial(orgName),
     title: row.title,
     region: row.region,
     dDay: dDay(row.deadline, now),

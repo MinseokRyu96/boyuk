@@ -12,6 +12,8 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // SEED CLI가 생성하는 스니펫. 다시 받으면 덮어써지므로 직접 고치지 않고 린트에서 뺀다
+    "seed-design/**",
   ]),
 ]);
 

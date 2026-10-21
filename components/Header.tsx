@@ -8,10 +8,10 @@ type Props = {
 /** 서비스명과 "N분 전 업데이트"만 둔 고정 헤더 (PRD 8장) */
 export function Header({ freshness }: Props) {
   return (
-    <header className="sticky top-0 z-10 border-b border-line bg-surface/95 backdrop-blur">
-      <div className="flex min-h-14 items-baseline justify-between gap-3 px-4 py-3">
-        <h1 className="text-[18px] font-extrabold tracking-tight text-brand">보육공고</h1>
-        <p className="text-[14px] text-ink-soft" aria-live="polite">
+    <header className="sticky top-0 z-10 border-b border-stroke-neutral-muted bg-bg-layer-default">
+      <div className="flex min-h-14 items-baseline justify-between gap-x3 px-x4 py-x3">
+        <h1 className="t6-bold tracking-tight text-fg-brand">보육공고</h1>
+        <p className="t4-regular text-fg-neutral-muted" aria-live="polite">
           {freshness ? <UpdatedAgo {...freshness} /> : <span aria-hidden="true">&nbsp;</span>}
         </p>
       </div>

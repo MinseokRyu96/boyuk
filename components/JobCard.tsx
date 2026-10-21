@@ -1,63 +1,70 @@
 import type { DDayLevel } from "@/lib/time";
 import type { FeedCard } from "@/lib/types";
+import { Avatar } from "seed-design/ui/avatar";
+import { Badge } from "seed-design/ui/badge";
+import { TagGroupItem, TagGroupRoot } from "seed-design/ui/tag-group";
 
-const chip = "inline-flex items-center rounded-md px-2 py-0.5 text-[13px] font-semibold leading-5";
-
-/** lib/avatar.ts의 AVATAR_TONE_COUNT와 개수를 맞춘다 */
-const AVATAR_TONES = [
-  "bg-tone-sky-bg text-tone-sky-ink",
-  "bg-tone-violet-bg text-tone-violet-ink",
-  "bg-tone-lime-bg text-tone-lime-ink",
-  "bg-tone-slate-bg text-tone-slate-ink",
-  "bg-tone-mocha-bg text-tone-mocha-ink",
-];
-
-/** 마감이 가까울수록 진하게: 오늘마감은 채운 색, D-3 이하는 옅은 붉은색, 나머지는 회색 */
-const DDAY_STYLE: Record<DDayLevel, string> = {
-  today: "bg-urgent text-white",
-  soon: "bg-urgent-soft text-urgent",
-  normal: "bg-chip text-ink-soft",
-  open: "bg-chip text-ink-soft",
-};
+/**
+ * 마감이 가까울수록 진하게: 오늘마감은 채운 붉은색, D-3 이하는 옅은 붉은색, 나머지는 회색.
+ * SEED의 critical solid(red-700)는 흰 글자와 3.76:1이라 PRD 기준(4.5:1)에 못 미친다.
+ * 오늘마감만 한 단계 진한 red-800(5.68:1)으로 덮어쓴다. Tailwind 클래스가 SEED 컴포넌트보다 우선하는 설정(next.config.ts) 덕에 가능하다.
+ */
+const DDAY_BADGE = {
+  today: { tone: "critical", variant: "solid", extra: "bg-palette-red-800" },
+  soon: { tone: "critical", variant: "weak", extra: "" },
+  normal: { tone: "neutral", variant: "weak", extra: "" },
+  open: { tone: "neutral", variant: "weak", extra: "" },
+} as const satisfies Record<
+  DDayLevel,
+  { tone: "critical" | "neutral"; variant: "solid" | "weak"; extra: string }
+>;
 
 /** 카드 전체가 하나의 링크다. 원문은 새 탭에서 열려 돌아오면 스크롤 위치가 유지된다 (F3) */
 export function JobCard({ card }: { card: FeedCard }) {
-  const { orgName, avatar, title, region, dDay, sources, isNew, isWorkplace, url } = card;
+  const { orgName, initial, title, region, dDay, sources, isNew, isWorkplace, url } = card;
+  const { extra, ...ddayBadge } = DDAY_BADGE[dDay.level];
 
   return (
     <a
       href={url}
       target="_blank"
       rel="noopener noreferrer"
-      className="flex min-h-11 gap-3 rounded-2xl border border-line bg-card p-4 transition-colors active:bg-brand-soft focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand"
+      className="flex min-h-11 gap-x3 rounded-r4 border border-stroke-neutral-muted bg-bg-layer-default p-x4 transition-colors active:bg-bg-layer-default-pressed focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-stroke-brand-solid"
     >
-      <span
-        aria-hidden="true"
-        className={`grid size-12 shrink-0 place-items-center rounded-xl text-[20px] font-extrabold ${AVATAR_TONES[avatar.tone % AVATAR_TONES.length]}`}
-      >
-        {avatar.initial}
-      </span>
+      <Avatar size="48" fallback={initial} className="shrink-0" />
 
       <div className="min-w-0 flex-1">
-        <div className="flex items-start justify-between gap-2">
-          <p className="min-w-0 flex-1 truncate pt-0.5 text-[14px] font-semibold text-ink-soft">{orgName}</p>
-          <span className={`${chip} shrink-0 ${DDAY_STYLE[dDay.level]}`}>
+        <div className="flex items-start justify-between gap-x2">
+          <p className="t4-medium min-w-0 flex-1 truncate pt-x1 text-fg-neutral-muted">{orgName}</p>
+          <Badge size="large" {...ddayBadge} className={`shrink-0 ${extra}`}>
             {dDay.level !== "open" && <span className="sr-only">마감 </span>}
             {dDay.label}
-          </span>
+          </Badge>
         </div>
 
-        <h3 className="mt-1 line-clamp-2 text-[16px] font-bold leading-snug text-ink">{title}</h3>
-        {region && <p className="mt-1 text-[14px] text-ink-soft">{region}</p>}
+        <h3 className="t5-bold mt-x1 line-clamp-2 text-fg-neutral">{title}</h3>
+        {region && (
+          <TagGroupRoot size="t4" tone="neutral" className="mt-x1">
+            <TagGroupItem label={region} />
+          </TagGroupRoot>
+        )}
 
-        <div className="mt-2.5 flex flex-wrap gap-1.5">
+        <div className="mt-x3 flex flex-wrap gap-x2">
           {sources.map((source) => (
-            <span key={source.code} className={`${chip} bg-brand-soft text-brand`}>
+            <Badge key={source.code} size="large" tone="neutral" variant="weak">
               {source.label}
-            </span>
+            </Badge>
           ))}
-          {isNew && <span className={`${chip} bg-new-bg text-new-ink`}>NEW</span>}
-          {isWorkplace && <span className={`${chip} bg-workplace-bg text-workplace-ink`}>직장</span>}
+          {isNew && (
+            <Badge size="large" tone="brand" variant="weak">
+              NEW
+            </Badge>
+          )}
+          {isWorkplace && (
+            <Badge size="large" tone="informative" variant="weak">
+              직장
+            </Badge>
+          )}
         </div>
 
         <span className="sr-only">원문 페이지가 새 탭에서 열려요</span>

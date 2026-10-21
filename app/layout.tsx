@@ -10,12 +10,14 @@ export const metadata: Metadata = {
 export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
-  themeColor: "#faf8f4",
+  themeColor: "#ffffff",
+  colorScheme: "light",
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
-    <html lang="ko" className="h-full antialiased">
+    // SEED 테마: 밝은 테마로 고정한다 (어두운 테마는 MVP 범위가 아니다)
+    <html lang="ko" className="h-full antialiased" data-seed data-seed-color-mode="light-only">
       <body className="min-h-full">{children}</body>
     </html>
   );

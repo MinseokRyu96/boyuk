@@ -1,6 +1,9 @@
 "use client";
 
+import { IconArrowUpLine } from "@karrotmarket/react-monochrome-icon";
+import { PrefixIcon } from "@seed-design/react";
 import { useEffect, useState } from "react";
+import { ContextualFloatingButton } from "seed-design/ui/contextual-floating-button";
 
 /** 이만큼 내려오면 "맨 위로" 버튼을 보여준다 (카드 5~6장 정도) */
 const SHOW_AFTER_PX = 900;
@@ -17,19 +20,22 @@ export function ScrollTopButton() {
 
   if (!visible) return null;
 
+  // 바깥 상자는 클릭을 가로채지 않고, 버튼만 눌리도록 한다.
+  // 아래 여백은 SEED 토큰(bottom-x5)이 아니라 Tailwind 기본 값(bottom-5)이다. SEED 테마는 inset 유틸리티에는 x 토큰을 주지 않는다.
+  // SEED 버튼은 높이가 36px이라 터치 영역 기준(44px)에 맞게 min-h-11을 준다.
   return (
-    <button
-      type="button"
-      onClick={() => {
-        const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-        window.scrollTo({ top: 0, behavior: reduce ? "auto" : "smooth" });
-      }}
-      className="pill-in fixed bottom-5 left-1/2 z-20 inline-flex min-h-11 -translate-x-1/2 items-center gap-1.5 rounded-full bg-brand px-5 text-[15px] font-semibold text-white shadow-[0_6px_20px_rgb(11_107_93/0.35)] active:opacity-85 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand"
-    >
-      <svg aria-hidden="true" viewBox="0 0 20 20" className="size-4" fill="none" stroke="currentColor" strokeWidth="2.2">
-        <path d="M5 12l5-5 5 5" strokeLinecap="round" strokeLinejoin="round" />
-      </svg>
-      맨 위로
-    </button>
+    <div className="pointer-events-none fixed inset-x-0 bottom-5 z-20 flex justify-center">
+      <ContextualFloatingButton
+        variant="solid"
+        className="pill-in pointer-events-auto min-h-11"
+        onClick={() => {
+          const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+          window.scrollTo({ top: 0, behavior: reduce ? "auto" : "smooth" });
+        }}
+      >
+        <PrefixIcon svg={<IconArrowUpLine />} />
+        맨 위로
+      </ContextualFloatingButton>
+    </div>
   );
 }
