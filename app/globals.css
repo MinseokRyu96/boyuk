@@ -1,26 +1,80 @@
 @import "tailwindcss";
 
+/*
+ * 색 대비는 본문 4.5:1 이상을 기준으로 골랐다 (PRD 8장).
+ * 밝은 테마만 지원한다. 어두운 테마는 MVP 범위가 아니다.
+ */
+@theme {
+  --color-canvas: #ebe6dd;
+  --color-surface: #faf8f4;
+  --color-card: #ffffff;
+  --color-line: #e4ded3;
+  --color-ink: #1c2826;
+  --color-ink-soft: #52605d;
+  --color-brand: #0b6b5d;
+  --color-brand-soft: #e6f1ee;
+  --color-urgent: #b3261e;
+  --color-urgent-soft: #fce8e6;
+  --color-chip: #edf0ef;
+  --color-new-bg: #ffe8b3;
+  --color-new-ink: #6b3f00;
+  --color-workplace-bg: #e4eaff;
+  --color-workplace-ink: #2a3f9e;
+
+  /*
+   * 어린이집 타일 색 (lib/avatar.ts의 AVATAR_TONE_COUNT와 개수를 맞춘다).
+   * 칩이 의미로 쓰는 색(빨강=마감 임박, 노랑=NEW, 남색=직장, 초록=출처)은 피해서 섞여 보이지 않게 한다.
+   */
+  --color-tone-sky-bg: #ddf1fa;
+  --color-tone-sky-ink: #0b5878;
+  --color-tone-violet-bg: #eee7fb;
+  --color-tone-violet-ink: #5b33a6;
+  --color-tone-lime-bg: #eaf3d3;
+  --color-tone-lime-ink: #3f5a0a;
+  --color-tone-slate-bg: #e6eaee;
+  --color-tone-slate-ink: #3b4753;
+  --color-tone-mocha-bg: #f1e8df;
+  --color-tone-mocha-ink: #5e4630;
+
+  --font-sans: -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", "Pretendard", "Noto Sans KR",
+    "Malgun Gothic", system-ui, sans-serif;
+}
+
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  color-scheme: light;
 }
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+/* 맨 위로 버튼이 아래에서 살짝 올라오며 나타난다 */
+@keyframes pill-in {
+  from {
+    opacity: 0;
+    transform: translate(-50%, 8px);
+  }
+  to {
+    opacity: 1;
+    transform: translate(-50%, 0);
+  }
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+.pill-in {
+  animation: pill-in 180ms ease-out;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pill-in {
+    animation: none;
   }
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background: var(--color-canvas);
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+  font-size: 15px;
+  line-height: 1.5;
+  /* 한글은 단어 중간에서 줄을 바꾸지 않고, 공백 없이 긴 문자열만 어디서든 끊는다 */
+  word-break: keep-all;
+  overflow-wrap: anywhere;
+  -webkit-text-size-adjust: 100%;
+  -webkit-tap-highlight-color: transparent;
 }
