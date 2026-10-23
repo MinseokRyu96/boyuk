@@ -19,7 +19,7 @@ async function FeedLoader() {
             <Callout description="샘플 공고예요. 데이터베이스를 연결하면 실제 공고가 보여요." />
           </div>
         )}
-        <Feed initial={page} districtCounts={districtCounts} />
+        <Feed initial={page} districtCounts={districtCounts} mapKey={process.env.NEXT_PUBLIC_KAKAO_MAP_KEY || null} />
       </main>
       <Footer />
       <ScrollTopButton />

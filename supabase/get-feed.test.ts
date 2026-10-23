@@ -1,4 +1,4 @@
-import { readFileSync } from "node:fs";
+import { readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 import { PGlite } from "@electric-sql/pglite";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
@@ -60,7 +60,11 @@ beforeAll(async () => {
   db = new PGlite();
   // Supabase에 기본으로 있는 역할을 흉내 낸다. service_role은 행 단위 보안을 우회한다
   await db.exec(`create role anon nologin; create role authenticated nologin; create role service_role nologin bypassrls;`);
-  await db.exec(readFileSync(join(__dirname, "migrations/0001_init.sql"), "utf8"));
+  // 마이그레이션을 번호 순서대로 모두 적용한다 (실제 DB에 적용한 상태와 같게)
+  const migrations = join(__dirname, "migrations");
+  for (const file of readdirSync(migrations).filter((name) => name.endsWith(".sql")).sort()) {
+    await db.exec(readFileSync(join(migrations, file), "utf8"));
+  }
   // 스키마 사용 권한만 Supabase 기본값을 흉내 낸다. 테이블 권한은 마이그레이션 SQL이 스스로 부여해야 한다
   await db.exec(`grant usage on schema public to anon, authenticated, service_role;`);
 
@@ -180,5 +184,67 @@ describe("권한과 마감 처리", () => {
     expect(rows[0].n).toBeGreaterThanOrEqual(0);
     await db.exec(`reset role`);
     await db.exec(`set role anon`);
+  });
+});
+
+describe("위치 (0002_locations)", () => {
+  type PointRow = { group_key: string; org_name: string | null; lat: number | null; lng: number | null };
+
+  async function asServiceRole<T>(run: () => Promise<T>): Promise<T> {
+    await db.exec(`reset role`);
+    await db.exec(`set role service_role`);
+    try {
+      return await run();
+    } finally {
+      await db.exec(`reset role`);
+      await db.exec(`set role anon`);
+    }
+  }
+
+  it("묶인 공고의 위치는 좌표가 있는 행에서 위도·경도를 같은 행에서 가져온다", async () => {
+    const week = await kstDay(6);
+    await asServiceRole(async () => {
+      // 같은 dedupe_key의 두 행: 먼저 수집된 행에는 좌표가 없고, 나중 행에만 있다
+      await db.query(
+        `insert into jobs (source, source_id, title, org_name, deadline, url, dedupe_key, first_seen_at)
+         values ('work24', 'L1', 'L1', '위치어린이집', $1, 'https://x/L1', 'KL', now() - interval '3 hours'),
+                ('seoul_center', 'L2', 'L2', '위치어린이집', $1, 'https://x/L2', 'KL', now() - interval '2 hours')`,
+        [week],
+      );
+      await db.query(`update jobs set lat = 37.5665, lng = 126.978, geo_status = 'ok', geo_place = '위치어린이집 · 서울 중구', geocoded_at = now() where source_id = 'L2'`);
+    });
+    const { rows } = await db.query<PointRow>(`select group_key, org_name, lat, lng from get_feed(null, null, 100) where org_name = '위치어린이집'`);
+    expect(rows).toHaveLength(1);
+    expect(rows[0].lat).toBeCloseTo(37.5665, 4);
+    expect(rows[0].lng).toBeCloseTo(126.978, 3);
+  });
+
+  it("좌표가 없는 공고는 위도·경도가 null로 나온다 (기존 공고는 그대로 보인다)", async () => {
+    const { rows } = await db.query<PointRow>(`select org_name, lat, lng from get_feed(null, null, 100) where org_name = '해오름어린이집'`);
+    expect(rows).toHaveLength(2); // 0001 시험 자료의 해오름어린이집 묶음 두 개
+    expect(rows.every((r) => r.lat === null && r.lng === null)).toBe(true);
+  });
+
+  it("anon은 jobs의 위치 열도 읽을 수 있고, 쓸 수는 없다", async () => {
+    const { rows } = await db.query<{ n: number }>(`select count(lat)::int as n from jobs`);
+    expect(rows[0].n).toBeGreaterThan(0);
+    await expect(db.query(`update jobs set lat = 37.5, lng = 127`)).rejects.toThrow();
+  });
+
+  it("한반도 밖의 좌표, 위도만 있는 좌표, 위치 없이 'ok'인 행, 알 수 없는 상태는 저장되지 않는다", async () => {
+    await asServiceRole(async () => {
+      await expect(db.query(`update jobs set lat = 10, lng = 127 where source_id = 'L1'`)).rejects.toThrow();
+      await expect(db.query(`update jobs set lat = 37.5 where source_id = 'L1'`)).rejects.toThrow();
+      await expect(db.query(`update jobs set geo_status = 'ok' where source_id = 'L1'`)).rejects.toThrow();
+      await expect(db.query(`update jobs set geo_status = 'maybe' where source_id = 'L1'`)).rejects.toThrow();
+    });
+  });
+
+  it("못 찾은 공고는 좌표 없이 'not_found'로 남기고 다시 찾아볼 시각을 적는다", async () => {
+    await asServiceRole(async () => {
+      await db.query(`update jobs set geo_status = 'not_found', geocoded_at = now() where source_id = 'L1'`);
+      const { rows } = await db.query<{ geo_status: string; lat: number | null }>(`select geo_status, lat from jobs where source_id = 'L1'`);
+      expect(rows[0]).toEqual({ geo_status: "not_found", lat: null });
+    });
   });
 });

@@ -18,7 +18,7 @@ const rpc = vi.fn(async (name: string, args: { p_cursor_at: string | null; p_cur
 let client: unknown = { rpc };
 vi.mock("./supabase", () => ({ getPublicClient: () => client }));
 
-const { fetchDistrictCounts, fetchFeedPage } = await import("./jobs");
+const { fetchDistrictCounts, fetchFeedPage, fetchMapData } = await import("./jobs");
 
 /** i번째로 최신인 공고. 구는 guOf(i)로 정한다 */
 function makeRows(count: number, guOf: (i: number) => string | null, deadlineOf: (i: number) => string | null = () => "2099-12-31"): FeedRow[] {
@@ -169,6 +169,40 @@ describe("fetchFeedPage — 마감일 정렬", () => {
     expect(page.cards).toHaveLength(20);
     // 마감일 정렬의 커서(마감일을 담은 세 값)로 이어진다. 정렬 규칙 자체는 sort.test.ts가 시험한다
     expect(decodeCursor(page.nextCursor!)?.deadline).toBeDefined();
+  });
+});
+
+describe("fetchMapData", () => {
+  it("위치를 찾은 공고만 points에 담고, 전체 건수에는 못 찾은 공고도 센다", async () => {
+    rows = makeRows(10, () => "마포구").map((row, i) => (i < 6 ? { ...row, lat: 37.55 + i / 100, lng: 126.9 } : row));
+    const data = await fetchMapData(NOW);
+
+    expect(data.total).toBe(10);
+    expect(data.points).toHaveLength(6);
+    expect(data.points[0]).toMatchObject({ key: "k0000", orgName: "어린이집0", region: "서울 마포구", lat: 37.55, lng: 126.9 });
+    expect(data.points[0].url).toBe("https://example.com/0"); // 카드와 같은 내용(원문 링크 등)을 담는다
+  });
+
+  it("선택한 구의 공고만 돌려주고, 100건씩 여러 번 읽어 모은다", async () => {
+    rows = makeRows(250, (i) => (i % 2 === 0 ? "마포구" : "은평구")).map((row) => ({ ...row, lat: 37.5, lng: 126.9 }));
+    const data = await fetchMapData(NOW, ["은평구"]);
+
+    expect(data.total).toBe(125);
+    expect(data.points).toHaveLength(125);
+    expect(data.points.every((point) => point.region === "서울 은평구")).toBe(true);
+    expect(rpc).toHaveBeenCalledTimes(3);
+  });
+
+  it("위치가 아직 하나도 없으면(마이그레이션 전이거나 못 채움) points가 비어 있다", async () => {
+    rows = makeRows(5, () => "마포구");
+    expect(await fetchMapData(NOW)).toMatchObject({ total: 5, points: [] });
+  });
+
+  it("Supabase가 없을 때(샘플)는 위치가 없어서 지도가 비어 있다", async () => {
+    client = null;
+    const data = await fetchMapData(NOW);
+    expect(data.points).toEqual([]);
+    expect(data.total).toBeGreaterThan(0);
   });
 });
 

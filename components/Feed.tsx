@@ -9,6 +9,7 @@ import type { FeedPage } from "@/lib/types";
 import { DistrictFilter } from "./DistrictFilter";
 import { SkeletonCard } from "./FeedSkeleton";
 import { JobCard } from "./JobCard";
+import { MapView } from "./MapView";
 import { RetryNotice } from "./RetryNotice";
 
 type Status = "idle" | "loading" | "error";
@@ -27,8 +28,18 @@ async function requestPage(cursor: string | null, districts: readonly SeoulGu[],
   return res.json();
 }
 
-/** 공고 목록과 서울 구별 필터, 정렬(최신순·마감 임박순·마감 늦은순). 끝에 가까워지면 다음 20건을 이어서 불러온다 (F1) */
-export function Feed({ initial, districtCounts }: { initial: FeedPage; districtCounts: DistrictCounts }) {
+type View = "list" | "map";
+
+type Props = {
+  initial: FeedPage;
+  districtCounts: DistrictCounts;
+  /** 카카오맵 JavaScript 키. 없으면 지도 보기를 숨긴다 */
+  mapKey: string | null;
+};
+
+/** 공고 목록(또는 지도)과 서울 구별 필터, 정렬(최신순·마감 임박순·마감 늦은순). 끝에 가까워지면 다음 20건을 이어서 불러온다 (F1) */
+export function Feed({ initial, districtCounts, mapKey }: Props) {
+  const [view, setView] = useState<View>("list");
   const [selected, setSelected] = useState<SeoulGu[]>([]);
   const [sort, setSort] = useState<FeedSort>("new");
   const [cards, setCards] = useState(initial.cards);
@@ -143,62 +154,77 @@ export function Feed({ initial, districtCounts }: { initial: FeedPage; districtC
         {`${filtered ? `${selected.join(", ")} ` : ""}${SORT_LABELS[sort]} 공고 ${shownCount}건`}
       </p>
 
-      <div className="px-x4 pt-x4">
-        <SegmentedControl aria-label="공고 정렬" value={sort} onValueChange={changeSort} style={{ width: "100%" }}>
-          {FEED_SORTS.map((order) => (
-            <SegmentedControlItem key={order} value={order}>
-              {SORT_LABELS[order]}
-            </SegmentedControlItem>
-          ))}
-        </SegmentedControl>
-      </div>
+      {mapKey && (
+        <div className="px-x4 pt-x4">
+          <SegmentedControl aria-label="보기 방식" value={view} onValueChange={(next) => setView(next === "map" ? "map" : "list")} style={{ width: "100%" }}>
+            <SegmentedControlItem value="list">목록</SegmentedControlItem>
+            <SegmentedControlItem value="map">지도</SegmentedControlItem>
+          </SegmentedControl>
+        </div>
+      )}
 
-      <div className="flex items-baseline justify-between px-x4 pt-x5">
-        <h2 className="t6-bold text-fg-neutral">{HEADINGS[sort]}</h2>
-        <span className="t4-regular text-fg-neutral-muted">{shownCount}건</span>
-      </div>
-
-      {failedWithoutCards ? (
-        <RetryNotice title="공고를 불러오지 못했어요" description="잠시 후 다시 시도해 주세요." onRetry={reload} />
-      ) : empty ? (
-        filtered ? (
-          <RetryNotice
-            title="선택한 지역에 지금 공고가 없어요"
-            description="다른 지역을 고르거나 전체 공고를 확인해 보세요."
-            onRetry={() => changeDistricts([])}
-            actionLabel="전체 공고 보기"
-          />
-        ) : (
-          <RetryNotice
-            title="지금 볼 수 있는 공고가 없어요"
-            description="새 공고가 올라오면 이곳에 모아 보여드려요."
-            onRetry={reload}
-          />
-        )
+      {mapKey && view === "map" ? (
+        <MapView appKey={mapKey} districts={selected} onShowList={() => setView("list")} />
       ) : (
         <>
-          <ul className="flex flex-col gap-x3 px-x4 pb-x4 pt-x3">
-            {cards.map((card) => (
-              <li key={card.key}>
-                <JobCard card={card} />
-              </li>
-            ))}
-            {waiting && (
-              <>
-                <SkeletonCard />
-                <SkeletonCard />
-              </>
-            )}
-          </ul>
+          <div className="px-x4 pt-x4">
+            <SegmentedControl aria-label="공고 정렬" value={sort} onValueChange={changeSort} style={{ width: "100%" }}>
+              {FEED_SORTS.map((order) => (
+                <SegmentedControlItem key={order} value={order}>
+                  {SORT_LABELS[order]}
+                </SegmentedControlItem>
+              ))}
+            </SegmentedControl>
+          </div>
 
-          {status === "error" && (
-            <RetryNotice title="다음 공고를 불러오지 못했어요" description="네트워크를 확인하고 다시 시도해 주세요." onRetry={loadMore} />
+          <div className="flex items-baseline justify-between px-x4 pt-x5">
+            <h2 className="t6-bold text-fg-neutral">{HEADINGS[sort]}</h2>
+            <span className="t4-regular text-fg-neutral-muted">{shownCount}건</span>
+          </div>
+
+          {failedWithoutCards ? (
+            <RetryNotice title="공고를 불러오지 못했어요" description="잠시 후 다시 시도해 주세요." onRetry={reload} />
+          ) : empty ? (
+            filtered ? (
+              <RetryNotice
+                title="선택한 지역에 지금 공고가 없어요"
+                description="다른 지역을 고르거나 전체 공고를 확인해 보세요."
+                onRetry={() => changeDistricts([])}
+                actionLabel="전체 공고 보기"
+              />
+            ) : (
+              <RetryNotice
+                title="지금 볼 수 있는 공고가 없어요"
+                description="새 공고가 올라오면 이곳에 모아 보여드려요."
+                onRetry={reload}
+              />
+            )
+          ) : (
+            <>
+              <ul className="flex flex-col gap-x3 px-x4 pb-x4 pt-x3">
+                {cards.map((card) => (
+                  <li key={card.key}>
+                    <JobCard card={card} />
+                  </li>
+                ))}
+                {waiting && (
+                  <>
+                    <SkeletonCard />
+                    <SkeletonCard />
+                  </>
+                )}
+              </ul>
+
+              {status === "error" && (
+                <RetryNotice title="다음 공고를 불러오지 못했어요" description="네트워크를 확인하고 다시 시도해 주세요." onRetry={loadMore} />
+              )}
+              {cursor === null && cards.length > 0 && (
+                <p className="t4-regular px-x4 pb-x6 text-center text-fg-neutral-muted">모든 공고를 확인했어요</p>
+              )}
+              {/* 이 요소가 화면 가까이 오면 다음 페이지를 요청한다 */}
+              <div ref={sentinel} aria-hidden="true" className="h-px" />
+            </>
           )}
-          {cursor === null && cards.length > 0 && (
-            <p className="t4-regular px-x4 pb-x6 text-center text-fg-neutral-muted">모든 공고를 확인했어요</p>
-          )}
-          {/* 이 요소가 화면 가까이 오면 다음 페이지를 요청한다 */}
-          <div ref={sentinel} aria-hidden="true" className="h-px" />
         </>
       )}
     </>

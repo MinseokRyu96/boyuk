@@ -120,6 +120,39 @@ describe("runCollector", () => {
     expect(calls.upserts[0].rows.map((row) => row.source_id)).toEqual(["seoul", "seoul-only"]);
   });
 
+  it("공고를 저장한 뒤 사라진 공고를 숨기기 전에 위치를 채운다", async () => {
+    const { db, calls } = fakeDb();
+    let upsertsWhenCalled = -1;
+    let hidesWhenCalled = -1;
+    const geocode = vi.fn(async () => {
+      upsertsWhenCalled = calls.upserts.length;
+      hidesWhenCalled = calls.updates.length;
+    });
+
+    const result = await runCollector(collectorOf({ complete: true, jobs: [job("1", "신입 담임교사")] }), db, { geocode });
+
+    expect(result.status).toBe("success");
+    expect(geocode).toHaveBeenCalledTimes(1);
+    expect(geocode).toHaveBeenCalledWith(db);
+    expect(upsertsWhenCalled).toBe(1);
+    expect(hidesWhenCalled).toBe(0);
+  });
+
+  it("위치를 채우다 실패해도 수집은 성공으로 기록한다", async () => {
+    const { db, calls } = fakeDb();
+    const log = vi.spyOn(console, "error").mockImplementation(() => {});
+    const result = await runCollector(
+      collectorOf({ complete: true, jobs: [job("1", "신입 담임교사")] }),
+      db,
+      { geocode: async () => { throw new Error("카카오 한도 초과"); } },
+    );
+
+    expect(result).toMatchObject({ status: "success", saved: 1 });
+    expect(calls.runs[0]).toMatchObject({ status: "success" });
+    expect(log).toHaveBeenCalledWith(expect.stringContaining("카카오 한도 초과"));
+    log.mockRestore();
+  });
+
   it("직장어린이집 운영업체 소스는 is_workplace를 true로 저장한다", async () => {
     const { db, calls } = fakeDb();
     await runCollector(collectorOf({ complete: true, jobs: [job("1", "신입 보육교사")] }, { source: "moamam", isWorkplace: true }), db);

@@ -6,7 +6,7 @@ import { toCard } from "./feed";
 import { buildSampleRows } from "./sample-jobs";
 import { paginateByDeadline, type FeedSort } from "./sort";
 import { getPublicClient } from "./supabase";
-import type { FeedPage, FeedRow } from "./types";
+import type { FeedPage, FeedRow, MapData } from "./types";
 
 /** Supabase가 연결되어 있지 않으면 샘플 데이터로 동작한다 */
 export function isSampleMode(): boolean {
@@ -113,6 +113,22 @@ export async function fetchFeedPage(
     cards: page.map((row) => toCard(row, now)),
     nextCursor: rows.length > PAGE_SIZE && last ? encodeCursor(cursorOf(last)) : null,
   };
+}
+
+/**
+ * 지도에 찍을 공고. 선택한 구(없으면 서울 전체)의 공고 중 위치를 찾은 것만 points에 담고, 전체 건수도 함께 돌려준다.
+ * 위치는 get_feed가 돌려주는 lat·lng이다 (0002 마이그레이션 전에는 없어서 points가 비어 있다).
+ * 샘플 데이터에는 위치가 없어서 지도가 비어 있다.
+ */
+export async function fetchMapData(now: Date = new Date(), districts: readonly string[] = []): Promise<MapData> {
+  const client = getPublicClient();
+  const rows = client
+    ? await scanAll(client, districts)
+    : buildSampleRows(now).filter((row) => matchesDistricts(row.region, districts));
+  const points = rows.flatMap((row) =>
+    typeof row.lat === "number" && typeof row.lng === "number" ? [{ ...toCard(row, now), lat: row.lat, lng: row.lng }] : [],
+  );
+  return { points, total: rows.length };
 }
 
 /** 지금 보이는 공고의 구별 건수. 구 필터 칩에 숫자를 붙이는 데 쓴다 (같은 공고는 이미 한 건으로 묶여 있다) */

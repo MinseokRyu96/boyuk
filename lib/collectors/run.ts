@@ -2,6 +2,7 @@ import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { dedupeKey } from "../dedupe";
 import { isChildcareContext, isTarget } from "../normalize";
+import { geocodeFromEnv } from "../geo/geocode";
 import { getAdminClient } from "../supabase";
 import { TARGET_PROVINCES } from "./config";
 import { isInTargetRegion } from "./region";
@@ -70,12 +71,22 @@ async function record(db: SupabaseClient, startedAt: Date, result: RunResult): P
   if (error) console.error(`[collector:${result.source}] collector_runs 기록 실패: ${error.message}`);
 }
 
+/** 수집 직후 새 공고의 위치를 채운다 (지도 보기용). 카카오 키가 없으면 아무것도 하지 않는다 */
+async function geocodeNewJobs(db: SupabaseClient): Promise<unknown> {
+  return geocodeFromEnv(db, { limit: 40 });
+}
+
+export type RunOptions = {
+  /** 수집 직후 위치를 채우는 함수. 시험에서 바꿀 수 있고, 생략하면 카카오 키가 있을 때만 채운다 */
+  geocode?: (db: SupabaseClient) => Promise<unknown>;
+};
+
 /**
- * 수집 → 판별 → 중복 키 → upsert → 마감 처리 → 실행 기록 (PRD 6장, 부록 D).
+ * 수집 → 판별 → 중복 키 → upsert → 위치 채우기 → 마감 처리 → 실행 기록 (PRD 6장, 부록 D).
  * 수집기 하나가 던진 오류는 이 함수 안에서 막아 다른 소스에 번지지 않게 한다.
  * db는 시험에서 가짜를 넣을 수 있도록 바꿀 수 있고, 생략하면 service role 클라이언트를 쓴다.
  */
-export async function runCollector(collector: Collector, db: SupabaseClient = getAdminClient()): Promise<RunResult> {
+export async function runCollector(collector: Collector, db: SupabaseClient = getAdminClient(), options: RunOptions = {}): Promise<RunResult> {
   const startedAt = new Date();
   const seenAt = startedAt.toISOString();
   const result: RunResult = { source: collector.source, status: "success", fetched: 0, saved: 0 };
@@ -97,6 +108,13 @@ export async function runCollector(collector: Collector, db: SupabaseClient = ge
     if (rows.size > 0) {
       const { error } = await db.from("jobs").upsert([...rows.values()], { onConflict: "source,source_id" });
       if (error) throw new Error(`jobs 저장 실패: ${error.message}`);
+    }
+
+    // 위치를 못 채워도 수집은 성공이다. 지도에서만 빠지고 다음 수집에서 다시 시도한다
+    try {
+      await (options.geocode ?? geocodeNewJobs)(db);
+    } catch (e) {
+      console.error(`[collector:${collector.source}] 위치 채우기 실패: ${e instanceof Error ? e.message : String(e)}`);
     }
 
     if (complete) {

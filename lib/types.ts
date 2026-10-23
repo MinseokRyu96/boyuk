@@ -13,6 +13,9 @@ export type FeedRow = {
   sources: string[];
   /** ISO 8601 */
   first_seen_at: string;
+  /** 어린이집 위치(위도·경도). 아직 찾지 못했거나 0002 마이그레이션 전이면 null·없음 */
+  lat?: number | null;
+  lng?: number | null;
 };
 
 export type SourceBadge = { code: string; label: string };
@@ -34,4 +37,13 @@ export type FeedPage = {
   cards: FeedCard[];
   /** 다음 페이지가 없으면 null */
   nextCursor: string | null;
+};
+
+/** 지도에 찍는 공고 하나. 카드와 같은 내용에 위치(위도·경도)를 더했다 */
+export type MapPoint = FeedCard & { lat: number; lng: number };
+
+export type MapData = {
+  points: MapPoint[];
+  /** 조건에 맞는 공고 수. 위치를 찾지 못한 공고도 센다 (total - points.length가 지도에 없는 공고 수) */
+  total: number;
 };
