@@ -17,9 +17,11 @@ const EXPERIENCED_ONLY = [
   /경력\s*자(?!\s*우대)/,
 ];
 
+/** "비담임"은 담임이 아니라는 뜻이라 담임으로 세지 않는다 */
+const HOMEROOM = /(?<!비\s*)담임/;
 const TEACHER = /담임|보육\s*교사/;
-/** 담임이 아닌 보조·연장반 교사. PRD 미해결 질문에 따라 현재는 제외한다 */
-const ASSISTANT = /보조\s*교사|연장반|야간\s*연장|시간제/;
+/** 담임이 아닌 보조·연장반·대체·비담임 교사. PRD 미해결 질문에 따라 현재는 제외한다 */
+const ASSISTANT = /보조\s*[&·/,]?\s*(교사|선생|연장)|대체\s*(교사|선생)|비\s*담임|연장\s*(보육\s*)?(반|전담|전임|겸직|교사|선생)|야간\s*연장|시간제/;
 const OTHER_DUTY = /원장|조리|영양사|간호|운전|사무|청소/;
 /** 담임·보육교사라고 못 박지는 않았지만 교사를 구하는 글 */
 const GENERIC_TEACHER = /교사|선생님|보육/;
@@ -38,7 +40,7 @@ function matchesCareer(job: RawJob, text: string): boolean {
 }
 
 function matchesDuty(title: string, rawText: string): boolean {
-  if (ASSISTANT.test(title) && !/담임/.test(title)) return false;
+  if (ASSISTANT.test(title) && !HOMEROOM.test(title)) return false;
   if (TEACHER.test(title)) return true;
   if (OTHER_DUTY.test(title)) return false;
   if (TEACHER.test(rawText)) return true;

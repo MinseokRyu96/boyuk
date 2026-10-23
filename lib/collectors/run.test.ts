@@ -104,6 +104,19 @@ describe("runCollector", () => {
     expect(calls.upserts[0].rows[0]).toMatchObject({ source: "moamam", is_workplace: true });
   });
 
+  it("공고마다 직장어린이집 여부를 알려 주면 수집기 기본값보다 그 값을 따른다", async () => {
+    const { db, calls } = fakeDb();
+    await runCollector(
+      collectorOf({
+        complete: true,
+        jobs: [job("1", "신입 보육교사", { isWorkplace: true }), job("2", "신입 담임교사", { isWorkplace: false }), job("3", "신입 보육교사 모집")],
+      }),
+      db,
+    );
+    const byId = Object.fromEntries(calls.upserts[0].rows.map((row) => [row.source_id, row.is_workplace]));
+    expect(byId).toEqual({ "1": true, "2": false, "3": false });
+  });
+
   it("범용 채용 소스는 어린이집이 아닌 담임교사 공고(학원 등)를 저장하지 않는다", async () => {
     const { db, calls } = fakeDb();
     const result = await runCollector(

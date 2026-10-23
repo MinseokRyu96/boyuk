@@ -65,6 +65,27 @@ describe("isTarget — 직무 판별", () => {
     expect(isTarget(job("담임 및 보조교사 모집 신입"))).toBe(true);
   });
 
+  it("'보조 선생님'·'대체 선생님'·연장 전담 표현도 담임이 아니므로 제외한다", () => {
+    // 서울센터는 직종이 보육교사로 같아서, 담임이 아닌 공고는 제목 표현으로만 가릴 수 있다
+    expect(isTarget(job("보조 선생님 구인합니다", { rawText: "보육교사" }))).toBe(false);
+    expect(isTarget(job("대체 선생님 구합니다", { rawText: "보육교사" }))).toBe(false);
+    expect(isTarget(job("대체교사 모집", { rawText: "보육교사" }))).toBe(false);
+    expect(isTarget(job("연장전담교사 모집", { rawText: "보육교사" }))).toBe(false);
+    expect(isTarget(job("연장보육 전담교사 채용 공고", { rawText: "보육교사" }))).toBe(false);
+    expect(isTarget(job("담임교사 및 보조 선생님 모집", { rawText: "보육교사" }))).toBe(true);
+  });
+
+  it("'비담임'은 담임이 아니고, '연장교사'·'연장 전임 교사'도 제외한다", () => {
+    expect(isTarget(job("서울형비담임교사 모집합니다.", { rawText: "보육교사" }))).toBe(false);
+    expect(isTarget(job("비담임교사", { rawText: "보육교사" }))).toBe(false);
+    expect(isTarget(job("영아 연장교사를 채용합니다.", { rawText: "보육교사" }))).toBe(false);
+    expect(isTarget(job("연장 전임 교사", { rawText: "보육교사" }))).toBe(false);
+    expect(isTarget(job("8시간 보조&연장겸직 교사 채용", { rawText: "보육교사" }))).toBe(false);
+    expect(isTarget(job("보조·연장 교사 채용", { rawText: "보육교사" }))).toBe(false);
+    expect(isTarget(job("담임교사와 비담임교사 모집", { rawText: "보육교사" }))).toBe(true);
+    expect(isTarget(job("0세반 담임교사 모집", { rawText: "보육교사" }))).toBe(true);
+  });
+
   it("제목에 담임과 다른 직무가 함께 있으면 애매하므로 저장한다", () => {
     expect(isTarget(job("담임교사 및 조리원 모집 신입"))).toBe(true);
   });

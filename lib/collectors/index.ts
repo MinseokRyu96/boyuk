@@ -1,12 +1,16 @@
 import { CRON_SLUGS, SOURCES, type SourceCode } from "../sources";
+import { createHansolCollector } from "./hansol";
 import { createHttpClient } from "./http";
+import { createMoamamCollector } from "./moamam";
 import { createSaraminCollector } from "./saramin";
+import { createSeoulCenterCollector } from "./seoul-center";
 import type { Collector } from "./types";
 import { createWork24Collector } from "./work24";
 
 /*
  * 소스별 수집기 등록부. 아직 구현하지 않은 소스는 `pending(...)`이고, 엔드포인트가 501을 돌려준다.
  * 크롤러는 사이트별 robots.txt와 이용약관을 확인한 뒤 같은 방식으로 바꿔 끼운다. (PRD 5장, 11장 3단계)
+ * 크롤러는 실행할 때마다 robots.txt를 다시 확인하고, 막혀 있으면 요청을 보내지 않고 실패로 기록한다.
  */
 
 /** 아직 구현하지 않은 수집기. 엔드포인트는 501을 돌려주고 collector_runs에는 기록하지 않는다 */
@@ -25,10 +29,11 @@ const COLLECTORS: Record<SourceCode, Collector> = {
   // 인증키는 호출할 때 환경변수에서 읽는다. 없으면 수집 실패로 기록된다
   work24: createWork24Collector({ getAuthKey: () => process.env.WORK24_API_KEY, http: createHttpClient({ minIntervalMs: 1500 }) }),
   saramin: createSaraminCollector({ getAccessKey: () => process.env.SARAMIN_API_KEY, http: createHttpClient({ minIntervalMs: 1500 }) }),
-  seoul_center: pending("seoul_center"),
-  moamam: pending("moamam"),
+  // 크롤러는 사이트에 부담을 주지 않도록 요청 사이를 2초 띄운다
+  seoul_center: createSeoulCenterCollector({ http: createHttpClient({ minIntervalMs: 2000 }) }),
+  moamam: createMoamamCollector({ http: createHttpClient({ minIntervalMs: 2000 }) }),
   purunee: pending("purunee"),
-  hansol: pending("hansol"),
+  hansol: createHansolCollector({ http: createHttpClient({ minIntervalMs: 2000 }) }),
   samsung: pending("samsung"),
 };
 

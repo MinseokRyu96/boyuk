@@ -38,7 +38,7 @@ function toRow(collector: Collector, job: RawJob, seenAt: string): JobRow {
     region: job.region ?? null,
     deadline: job.deadline ?? null,
     url: job.url,
-    is_workplace: collector.isWorkplace,
+    is_workplace: job.isWorkplace ?? collector.isWorkplace,
     dedupe_key: dedupeKey(job.orgName, job.deadline),
     // 사라졌다가 다시 올라온 공고는 되살린다. 만료된 공고는 마지막 단계에서 다시 숨긴다
     is_active: true,

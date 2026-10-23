@@ -13,6 +13,8 @@ export type RawJob = {
   contextText?: string;
   /** API가 경력 구분을 줄 때만 */
   careerHint?: "new" | "any" | "experienced";
+  /** 공고마다 직장어린이집인지 알 수 있을 때만. 없으면 수집기의 isWorkplace를 따른다 */
+  isWorkplace?: boolean;
 };
 
 /** 수집기 한 번의 결과 */

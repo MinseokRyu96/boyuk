@@ -19,10 +19,11 @@ describe("findCollector", () => {
     expect(findCollector("seoul_center")).toBeUndefined();
   });
 
-  it("고용24와 사람인은 구현되어 있고, 나머지 소스는 아직 구현 전이다", () => {
-    expect(findCollector("work24")?.implemented).not.toBe(false);
-    expect(findCollector("saramin")?.implemented).not.toBe(false);
-    for (const slug of ["seoul-center", "moamam", "purunee", "hansol", "samsung"]) {
+  it("고용24·사람인·서울센터·모아맘·한솔은 구현되어 있고, 나머지 소스는 아직 구현 전이다", () => {
+    for (const slug of ["work24", "saramin", "seoul-center", "moamam", "hansol"]) {
+      expect(findCollector(slug)?.implemented).not.toBe(false);
+    }
+    for (const slug of ["purunee", "samsung"]) {
       expect(findCollector(slug)?.implemented).toBe(false);
     }
   });

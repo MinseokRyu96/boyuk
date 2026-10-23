@@ -16,7 +16,10 @@ import { safeHttpUrl } from "./url";
  *   2) career 값의 표기 (careerHintFromText)
  *   3) region 값의 표기 (normalizeRegion, 없으면 basicAddr로 보완)
  *   4) startPage가 쪽 번호인지 시작 위치인지 (어느 쪽이든 동작하도록 새 공고가 없으면 멈춘다)
- *   5) 오류 응답의 모양 (wantedRoot가 없으면 내용을 담아 오류로 던진다)
+ *
+ * 확인된 오류 응답: HTTP 200으로 <GO24><error>메시지</error></GO24>가 온다 (실제 호출로 확인, __fixtures__/work24-error.xml).
+ * 인증키가 이 서비스로 승인되지 않았거나 틀리면 "신청하신 OpenApi 서비스가 존재하지 않습니다"가 온다.
+ * 이때 서버는 틀린 키와 승인 안 된 키를 구분하지 않는다.
  */
 
 export const WORK24_LIST_URL = "https://www.work24.go.kr/cm/openApi/call/wk/callOpenApiSvcInfo210L01.do";
@@ -102,6 +105,10 @@ export function parseWork24List(xml: string): Work24Page {
   } catch {
     throw new Work24ApiError(`응답을 XML로 읽지 못했어요: ${snippet(xml)}`);
   }
+  // 고용24의 오류 응답: <GO24><error>메시지</error></GO24>
+  const serverError = isDict(doc) && isDict(doc.GO24) ? text(doc.GO24.error) : undefined;
+  if (serverError) throw new Work24ApiError(explainServerError(serverError));
+
   if (!isDict(doc) || !("wantedRoot" in doc)) {
     const roots = isDict(doc) ? Object.keys(doc).join(", ") : "";
     throw new Work24ApiError(`예상한 wantedRoot가 없어요 (최상위: ${roots || "없음"}): ${snippet(xml)}`);
@@ -117,6 +124,23 @@ export function parseWork24List(xml: string): Work24Page {
     itemCount: items.length,
     jobs: items.flatMap((item) => toRawJob(item) ?? []),
   };
+}
+
+/** 서버가 준 오류 문구에, 알려진 원인이 있으면 무엇을 확인할지 덧붙인다 */
+function explainServerError(message: string): string {
+  if (/개인회원/.test(message)) {
+    return (
+      `고용24 오류: ${message} 이 OPEN-API는 기업회원 전용이라서, 개인회원 계정에서 발급받은 인증키로는 쓸 수 없어요. ` +
+      "기업회원으로 가입한 계정에서 채용정보 API 인증키를 발급받아 주세요."
+    );
+  }
+  if (/서비스가 존재하지 않/.test(message)) {
+    return (
+      `고용24 오류: ${message}. 이 인증키가 '채용정보' API로 승인되지 않았거나 아직 반영되지 않았거나 키가 틀렸을 수 있어요. ` +
+      "고용24 > OPEN-API > 신청현황에서 서비스 이름과 승인 상태를 확인해 주세요."
+    );
+  }
+  return `고용24 오류: ${message}`;
 }
 
 /** 오류 메시지에 넣을 본문 앞부분 (공백을 줄이고 길이를 자른다) */

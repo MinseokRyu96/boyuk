@@ -220,3 +220,60 @@ describe("createWork24Collector", () => {
     expect(collector).toMatchObject({ source: "work24", isWorkplace: false, needsChildcareContext: true });
   });
 });
+
+describe("고용24 오류 응답 (실제 호출에서 확인한 <GO24><error> 형식)", () => {
+  const ERROR_XML = readFileSync(join(__dirname, "__fixtures__/work24-error.xml"), "utf8");
+
+  it("서버가 준 문구와 확인할 곳을 담은 오류로 던진다", () => {
+    const error = (() => {
+      try {
+        parseWork24List(ERROR_XML);
+      } catch (e) {
+        return e;
+      }
+    })();
+    expect(error).toBeInstanceOf(Work24ApiError);
+    const message = (error as Error).message;
+    expect(message).toContain("신청하신 OpenApi 서비스가 존재하지 않습니다");
+    expect(message).toContain("신청현황");
+    expect(message).not.toContain("wantedRoot");
+  });
+
+  it("알려진 원인이 아닌 서버 오류는 문구만 전달한다", () => {
+    expect(() => parseWork24List("<GO24><error>점검 중입니다</error></GO24>")).toThrow("고용24 오류: 점검 중입니다");
+  });
+
+  it("수집기는 첫 오류에서 바로 멈추고(불필요한 호출을 더 하지 않고), 오류 문구에 인증키가 들어가지 않는다", async () => {
+    const { http, get } = fakeHttp(() => ERROR_XML);
+    const error = (await createWork24Collector({ getAuthKey: () => "SECRET-KEY-VALUE", http, display: 2 }).fetchJobs().catch((e) => e)) as Error;
+    expect(error).toBeInstanceOf(Work24ApiError);
+    expect(error.message).toContain("신청하신 OpenApi 서비스가 존재하지 않습니다");
+    expect(error.message).not.toContain("SECRET-KEY-VALUE");
+    expect(get).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("고용24 오류 응답: 개인회원 계정의 키 (실제 호출에서 확인)", () => {
+  const INDIVIDUAL_XML = readFileSync(join(__dirname, "__fixtures__/work24-error-individual.xml"), "utf8");
+
+  it("기업회원 전용이라는 설명과 함께 오류로 던진다", () => {
+    const error = (() => {
+      try {
+        parseWork24List(INDIVIDUAL_XML);
+      } catch (e) {
+        return e;
+      }
+    })();
+    expect(error).toBeInstanceOf(Work24ApiError);
+    const message = (error as Error).message;
+    expect(message).toContain("개인회원은 사용할 수 없는 OPEN-API입니다");
+    expect(message).toContain("기업회원");
+    expect(message).not.toContain("신청현황"); // 승인 문제가 아니므로 다른 안내를 하지 않는다
+  });
+
+  it("수집기는 이 오류도 첫 호출에서 바로 멈춘다", async () => {
+    const { http, get } = fakeHttp(() => INDIVIDUAL_XML);
+    await expect(createWork24Collector({ getAuthKey: () => "KEY", http }).fetchJobs()).rejects.toThrow(/기업회원/);
+    expect(get).toHaveBeenCalledTimes(1);
+  });
+});
