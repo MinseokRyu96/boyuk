@@ -12,7 +12,9 @@ import { districtOf } from "../districts";
  * 카카오는 검색어의 모든 낱말이 맞아야 결과를 주는 듯해서, 이름 표기가 조금만 달라도(예: "서울형"이 붙은 이름, 띄어쓰기) 0건이 나온다.
  * 그래서 못 찾으면 이름의 알맹이("가나다")로 검색어를 바꿔 다시 찾는다. 2026-10-24에 실제 공고 45곳으로 시험했을 때
  * 처음 검색만으로 21곳, 변형까지 쓰면 32곳을 찾았다. 나머지는 카카오 지도에 없는 어린이집이다.
- * 이름이 비슷하지 않거나 주소가 해당 구가 아니면 위치를 못 찾은 것으로 한다. 틀린 곳에 핀을 꽂는 것보다 빠지는 편이 낫다.
+ * 이름이 비슷하지 않거나 주소가 해당 구가 아니거나, 장소가 어린이집이 아니면 위치를 못 찾은 것으로 한다.
+ * 틀린 곳에 핀을 꽂는 것보다 빠지는 편이 낫다. (실제로 "한강로어린이집"이 "한강로동 땡땡거리"로, "한가람어린이집"이
+ * "한가람고등학교"로, "파랑새어린이집"이 "도예공방파랑새"로 잡히는 일이 있어서 카테고리 조건을 뒀다.)
  */
 
 export const KAKAO_KEYWORD_URL = "https://dapi.kakao.com/v2/local/search/keyword.json";
@@ -21,6 +23,8 @@ export type KakaoDocument = {
   id?: string;
   place_name: string;
   category_name?: string;
+  /** 카카오 카테고리 그룹 코드. PS3은 어린이집·유치원이다 */
+  category_group_code?: string;
   address_name?: string;
   road_address_name?: string;
   /** 경도(문자열) */
@@ -71,21 +75,25 @@ export function sameOrg(a: string, b: string): boolean {
 
 const inKorea = (lat: number, lng: number) => lat >= 33 && lat <= 39 && lng >= 124 && lng <= 132;
 
+/** 카카오가 어린이집(또는 유치원)으로 분류한 장소인가. 아파트·병원·학교·가게는 이름이 비슷해도 어린이집이 아니다 */
+function isDaycare(doc: KakaoDocument): boolean {
+  return doc.category_group_code === "PS3" || Boolean(doc.category_name?.includes("어린이집"));
+}
+
 /**
  * 검색 결과에서 org에 맞는 장소 하나를 고른다 (없으면 null).
- * 조건: 이름이 같은 어린이집으로 볼 수 있고, 주소가 서울이며(구를 알면 그 구), 좌표가 한반도 안이어야 한다.
- * 조건을 만족하는 결과가 여럿이면 카테고리가 어린이집인 것을 먼저, 그다음 카카오가 준 순서(정확도순)를 따른다.
+ * 조건: 카카오가 어린이집으로 분류한 장소이고, 이름이 같은 어린이집으로 볼 수 있고, 주소가 서울이며(구를 알면 그 구),
+ * 좌표가 한반도 안이어야 한다. 조건을 만족하는 결과가 여럿이면 카카오가 준 순서(정확도순)의 첫 번째를 쓴다.
  */
 export function pickPlace(documents: readonly KakaoDocument[], org: string, region: string | null): PlaceMatch | null {
   const gu = districtOf(region);
-  const candidates = documents.filter((doc) => {
+  const best = documents.find((doc) => {
+    if (!isDaycare(doc)) return false;
     const address = doc.road_address_name || doc.address_name || "";
     if (!address.startsWith("서울")) return false;
     if (gu && !address.includes(gu)) return false;
     return sameOrg(doc.place_name, org);
   });
-  const daycare = (doc: KakaoDocument) => (doc.category_name?.includes("어린이집") ? 0 : 1);
-  const best = [...candidates].sort((a, b) => daycare(a) - daycare(b))[0];
   if (!best) return null;
 
   const lat = Number(best.y);
