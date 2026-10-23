@@ -51,6 +51,8 @@ const job = (id: string, title: string, extra: Partial<RawJob> = {}): RawJob => 
   sourceId: id,
   title,
   url: `https://example.com/${id}`,
+  // 서울이 아니거나 지역을 모르는 공고는 저장하지 않으므로, 기본값은 서울 공고다
+  region: "서울 강서구",
   ...extra,
 });
 
@@ -96,6 +98,26 @@ describe("runCollector", () => {
       is_active: true,
     });
     expect(row.dedupe_key).toMatch(/^[0-9a-f]{32}$/);
+  });
+
+  it("서울 공고만 저장한다: 다른 시·도와 지역을 모르는 공고는 저장하지 않는다", async () => {
+    const { db, calls } = fakeDb();
+    const result = await runCollector(
+      collectorOf({
+        complete: true,
+        jobs: [
+          job("seoul", "신입 담임교사", { region: "서울 마포구" }),
+          job("seoul-only", "신입 담임교사", { region: "서울" }),
+          job("gyeonggi", "신입 담임교사", { region: "경기 성남시" }),
+          job("busan", "신입 담임교사", { region: "부산" }),
+          job("unknown", "신입 담임교사", { region: undefined }),
+        ],
+      }),
+      db,
+    );
+
+    expect(result).toMatchObject({ fetched: 5, saved: 2 });
+    expect(calls.upserts[0].rows.map((row) => row.source_id)).toEqual(["seoul", "seoul-only"]);
   });
 
   it("직장어린이집 운영업체 소스는 is_workplace를 true로 저장한다", async () => {

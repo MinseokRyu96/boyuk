@@ -53,6 +53,8 @@ describe.skipIf(!enabled)("runCollector — 실제 Supabase DB", () => {
     sourceId: id,
     title,
     url: `https://example.com/${source}/${id}`,
+    // 서울이 아니거나 지역을 모르는 공고는 저장하지 않으므로, 기본값은 서울 공고다
+    region: "서울 강서구",
     ...extra,
   });
   const fake = (source: string, result: CollectResult | Error): Collector => ({

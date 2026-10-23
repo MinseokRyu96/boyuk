@@ -19,12 +19,9 @@ describe("findCollector", () => {
     expect(findCollector("seoul_center")).toBeUndefined();
   });
 
-  it("고용24·사람인·서울센터·모아맘·한솔·푸르니는 구현되어 있고, 나머지 소스는 아직 구현 전이다", () => {
-    for (const slug of ["work24", "saramin", "seoul-center", "moamam", "hansol", "purunee"]) {
+  it("모든 소스의 수집기가 구현되어 있다 (아직 구현 전이라 501을 돌려주는 소스는 없다)", () => {
+    for (const slug of ["work24", "saramin", "seoul-center", "moamam", "hansol", "purunee", "samsung"]) {
       expect(findCollector(slug)?.implemented).not.toBe(false);
-    }
-    for (const slug of ["samsung"]) {
-      expect(findCollector(slug)?.implemented).toBe(false);
     }
   });
 

@@ -1,9 +1,11 @@
 import { load } from "cheerio";
 import { HANSOL_MAX_PAGES } from "./config";
 import { parseLooseDate } from "./dates";
-import type { HttpClient } from "./http";
-import { normalizeRegion } from "./region";
+import { isTarget } from "../normalize";
+import { HttpError, type HttpClient } from "./http";
+import { inferRegion, normalizeRegion } from "./region";
 import { assertRobotsAllows } from "./robots";
+import { htmlToText } from "./text";
 import { orgNameFromTitle } from "./title";
 import type { CollectResult, Collector, RawJob } from "./types";
 
@@ -15,7 +17,9 @@ import type { CollectResult, Collector, RawJob } from "./types";
  * 접수 중인 공고만 받으면 마흔 건 남짓이라 네다섯 쪽이면 끝나서, 목록 전체를 본 것(complete: true)으로 처리한다.
  *
  * 목록 한 줄에는 구분(수시·정기), 제목, 접수 기간, 진행 상태뿐이다. 어린이집 이름은 제목에서 "…어린이집"까지를 떼어 쓰고,
- * 지역·경력 구분은 목록에 없다. 상세 페이지는 읽지 않는다 (요청이 늘고 얻는 정보가 적다).
+ * 경력 구분은 목록에 없다. 지역도 목록에 없어서, 제목에서 서울을 읽지 못한 공고 중 신입·담임 판별을 통과한 것만
+ * 상세 페이지를 열어 본문의 "근무지 : 경북 포항" 한 줄에서 지역을 읽는다 (서울 공고만 보여 주기 때문이다).
+ * 상세에서는 근무지 외에는 읽지 않고, 담당자 연락처 같은 개인정보는 가져오지 않는다.
  * 원문 링크는 사이트 바깥 틀(index.do)에 상세를 넣어 보여 주는 GET 주소다.
  */
 
@@ -87,7 +91,7 @@ export function parseHansolList(html: string): HansolPage {
       sourceId: sn,
       title,
       orgName: orgNameFromTitle(title),
-      region: regionFromTitle(title),
+      region: regionFromTitle(title) ?? inferRegion(title),
       deadline: parseLooseDate(period.split("~")[1]),
       url: `${ORIGIN}/recruit/index.do?flg=view&mCurrent=2&sCurrent=3&empmn_sn=${sn}`,
     });
@@ -105,6 +109,27 @@ export function parseHansolList(html: string): HansolPage {
 }
 
 /** 접수 중인 교사채용 공고 목록의 page쪽 주소 */
+/** 공고 상세(iframe이 불러오는 화면) 주소 */
+export function buildHansolDetailUrl(sn: string): string {
+  return `${HANSOL_LIST_URL}?flg=view&mCurrent=2&sCurrent=3&empmn_sn=${sn}`;
+}
+
+/** 공고 상세 본문의 "근무지 : 경북 포항" 한 줄에서 지역을 읽는다. 없거나 알아볼 수 없으면 undefined */
+export function parseHansolWorkplace(html: string): string | undefined {
+  const value = /근무지\s*[:：]\s*([^\n\r]{1,40})/.exec(htmlToText(html))?.[1]?.trim();
+  return value ? (normalizeRegion(value) ?? inferRegion(value)) : undefined;
+}
+
+/** 지역을 읽지 못하는 일시 오류(없는 페이지·서버 오류·연결 실패)는 지역 없음으로 두고, 접근 거부 같은 오류는 그대로 던진다 */
+async function fetchWorkplaceRegion(http: HttpClient, sn: string): Promise<string | undefined> {
+  try {
+    return parseHansolWorkplace((await http.get(buildHansolDetailUrl(sn))).body);
+  } catch (error) {
+    if (error instanceof HttpError && (error.status === null || error.status === 404 || error.status >= 500)) return undefined;
+    throw error;
+  }
+}
+
 export function buildHansolUrl(page: number): string {
   return `${HANSOL_LIST_URL}?flg=list&mCurrent=2&sCurrent=1&empmn_sn=&pageNum=${page}&listNum=${PAGE_SIZE}&STTUS=001`;
 }
@@ -140,8 +165,14 @@ export function createHansolCollector(options: HansolCollectorOptions): Collecto
         }
       }
 
+      // 지역을 모르는 신입·담임 후보는 상세에서 근무지를 읽는다. 후보가 아닌 공고는 어차피 저장하지 않으므로 요청하지 않는다
+      const jobs = [...found.values()];
+      for (const job of jobs) {
+        if (!job.region && isTarget(job)) job.region = await fetchWorkplaceRegion(http, job.sourceId);
+      }
+
       // 쪽 상한에 막혔다면 목록 일부만 읽은 것이다
-      return { jobs: [...found.values()], complete: reachedEnd };
+      return { jobs, complete: reachedEnd };
     },
   };
 }

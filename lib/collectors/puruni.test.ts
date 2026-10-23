@@ -28,9 +28,9 @@ describe("parsePuruniList — 시험용 축약 목록", () => {
     });
   });
 
-  it("대괄호가 시·도로 시작할 때만 지역을 쓴다 ([서울마포]는 서울, [서대문구]는 알 수 없음, 대괄호 없음도 없음)", () => {
+  it("지역: [서울마포]는 서울, [서대문구]는 서울에만 있는 구라서 서울 서대문구, 대괄호에 지역이 없으면 없음", () => {
     expect(byId("9400004")?.region).toBe("서울");
-    expect(byId("9400003")?.region).toBeUndefined();
+    expect(byId("9400003")?.region).toBe("서울 서대문구");
     expect(byId("9400001")?.region).toBeUndefined();
   });
 

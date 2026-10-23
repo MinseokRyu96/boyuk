@@ -70,3 +70,29 @@ export function normalizeRegion(raw: string | undefined | null): string | undefi
   const district = tokens.slice(1).find((token) => /[시군구]$/.test(token));
   return district ? `${province} ${district}` : province;
 }
+
+/** 시·도 이름이 구 이름만으로는 정해지지 않는 곳(강서구는 부산에도, 중구는 여러 시에 있다)은 뺀 서울의 구 */
+const SEOUL_DISTRICTS = [
+  "강남구", "강동구", "강북구", "관악구", "광진구", "구로구", "금천구", "노원구", "도봉구", "동대문구", "동작구", "마포구",
+  "서대문구", "서초구", "성동구", "성북구", "송파구", "양천구", "영등포구", "용산구", "은평구", "종로구", "중랑구",
+];
+
+/**
+ * 지역 칸이 없는 출처(한솔·삼성·푸르니)의 제목·어린이집명에서 서울을 읽는다. 글자로 분명히 적혀 있을 때만 읽고 추측하지 않는다.
+ *  - "서대문구 …"처럼 서울에만 있는 구 이름이 있으면 "서울 서대문구"
+ *  - "서울"이 있으면 "서울" ("서울형어린이집"·"삼성서울병원어린이집" 포함. "서울대학교 시흥캠퍼스"처럼 다른 곳일 수도 있다)
+ * 서울이 아닌 곳은 읽지 않는다(서울만 보여 주므로 필요 없다). 알 수 없으면 undefined.
+ */
+export function inferRegion(text: string | undefined | null): string | undefined {
+  if (!text) return undefined;
+  const district = SEOUL_DISTRICTS.find((name) => text.includes(name));
+  if (district) return `서울 ${district}`;
+  return text.includes("서울") ? "서울" : undefined;
+}
+
+/** region("서울 강서구" 같은 짧은 표기)이 보여 줄 시·도에 속하는가. provinces가 비어 있으면 모두 속한다. 지역이 없으면 속하지 않는다 */
+export function isInTargetRegion(region: string | undefined | null, provinces: readonly string[]): boolean {
+  if (provinces.length === 0) return true;
+  if (!region) return false;
+  return provinces.includes(region.split(" ")[0]);
+}

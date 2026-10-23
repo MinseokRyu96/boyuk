@@ -1,30 +1,19 @@
-import { CRON_SLUGS, SOURCES, type SourceCode } from "../sources";
+import { CRON_SLUGS, type SourceCode } from "../sources";
 import { createHansolCollector } from "./hansol";
 import { createHttpClient } from "./http";
 import { createMoamamCollector } from "./moamam";
 import { createPuruniCollector } from "./puruni";
+import { createSamsungCollector } from "./samsung";
 import { createSaraminCollector } from "./saramin";
 import { createSeoulCenterCollector } from "./seoul-center";
 import type { Collector } from "./types";
 import { createWork24Collector } from "./work24";
 
 /*
- * 소스별 수집기 등록부. 아직 구현하지 않은 소스는 `pending(...)`이고, 엔드포인트가 501을 돌려준다.
- * 크롤러는 사이트별 robots.txt와 이용약관을 확인한 뒤 같은 방식으로 바꿔 끼운다. (PRD 5장, 11장 3단계)
+ * 소스별 수집기 등록부. 새 소스를 구현하지 못했을 때는 `implemented: false`인 수집기를 두면 엔드포인트가 501을 돌려준다.
+ * 크롤러는 사이트별 robots.txt와 이용약관을 확인한 뒤 연결한다. (PRD 5장, 11장 3단계)
  * 크롤러는 실행할 때마다 robots.txt를 다시 확인하고, 막혀 있으면 요청을 보내지 않고 실패로 기록한다.
  */
-
-/** 아직 구현하지 않은 수집기. 엔드포인트는 501을 돌려주고 collector_runs에는 기록하지 않는다 */
-function pending(source: SourceCode): Collector {
-  return {
-    source,
-    isWorkplace: SOURCES[source].isWorkplace,
-    implemented: false,
-    async fetchJobs() {
-      throw new Error(`${source} 수집기는 아직 구현되지 않았어요.`);
-    },
-  };
-}
 
 const COLLECTORS: Record<SourceCode, Collector> = {
   // 인증키는 호출할 때 환경변수에서 읽는다. 없으면 수집 실패로 기록된다
@@ -37,7 +26,8 @@ const COLLECTORS: Record<SourceCode, Collector> = {
   // 끄려면 ignoreRobotsTxt를 지우면 된다(그러면 수집이 CrawlNotAllowedError로 멈춘다). 자세한 이유는 puruni.ts 머리 주석.
   purunee: createPuruniCollector({ http: createHttpClient({ minIntervalMs: 2000 }), ignoreRobotsTxt: true }),
   hansol: createHansolCollector({ http: createHttpClient({ minIntervalMs: 2000 }) }),
-  samsung: pending("samsung"),
+  // 삼성복지재단도 robots.txt가 전체 금지다. 푸르니와 같은 이유로 이 사이트도 robots.txt를 무시한다 (samsung.ts 머리 주석).
+  samsung: createSamsungCollector({ http: createHttpClient({ minIntervalMs: 2000 }), ignoreRobotsTxt: true }),
 };
 
 /** /api/cron/[source]의 주소 값으로 수집기를 찾는다. 알 수 없는 값이면 undefined */

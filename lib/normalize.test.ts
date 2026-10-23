@@ -70,6 +70,7 @@ describe("isTarget — 직무 판별", () => {
     expect(isTarget(job("보조 선생님 구인합니다", { rawText: "보육교사" }))).toBe(false);
     expect(isTarget(job("대체 선생님 구합니다", { rawText: "보육교사" }))).toBe(false);
     expect(isTarget(job("대체교사 모집", { rawText: "보육교사" }))).toBe(false);
+    expect(isTarget(job("출산휴가 및 육아휴직대체보육교사"))).toBe(false);
     expect(isTarget(job("연장전담교사 모집", { rawText: "보육교사" }))).toBe(false);
     expect(isTarget(job("연장보육 전담교사 채용 공고", { rawText: "보육교사" }))).toBe(false);
     expect(isTarget(job("담임교사 및 보조 선생님 모집", { rawText: "보육교사" }))).toBe(true);

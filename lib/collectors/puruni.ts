@@ -2,7 +2,7 @@ import { load } from "cheerio";
 import { PURUNI_MAX_PAGES } from "./config";
 import { parseLooseDate } from "./dates";
 import type { HttpClient } from "./http";
-import { normalizeRegion } from "./region";
+import { inferRegion, normalizeRegion } from "./region";
 import { assertRobotsAllows } from "./robots";
 import { orgNameFromTitle } from "./title";
 import type { CollectResult, Collector, RawJob } from "./types";
@@ -79,7 +79,7 @@ export function parsePuruniList(html: string): PuruniPage {
       sourceId: idx,
       title,
       orgName: orgNameFromTitle(title),
-      region: regionFromBracket(title),
+      region: regionFromBracket(title) ?? inferRegion(title),
       deadline: parseLooseDate(period.split("~")[1]),
       url: `${PURUNI_VIEW_URL}?page=${page}&idx=${idx}`,
     });

@@ -5,9 +5,11 @@ import { isTarget } from "../normalize";
 import {
   HANSOL_LIST_URL,
   HansolError,
+  buildHansolDetailUrl,
   buildHansolUrl,
   createHansolCollector,
   parseHansolList,
+  parseHansolWorkplace,
 } from "./hansol";
 import { HttpError, type HttpClient, type HttpResponse } from "./http";
 import { CrawlNotAllowedError } from "./robots";
@@ -44,6 +46,11 @@ describe("parseHansolList — 시험용 축약 목록", () => {
     expect(byId("9300007")?.region).toBeUndefined();
   });
 
+  it("제목에 서울의 구 이름이나 '서울'이 있으면 지역을 서울로 읽는다 (목록에 지역 칸이 없다)", () => {
+    const html = LIST_HTML.replace("가나다어린이집 영아반 담임교사 채용공고(계약직)", "마포구 가나다어린이집 영아반 담임교사 채용공고(계약직)");
+    expect(parseHansolList(html).jobs.find((job) => job.sourceId === "9300005")?.region).toBe("서울 마포구");
+  });
+
   it("쪽 이동 링크가 현재 쪽보다 뒤에 있으면 다음 쪽이 있다", () => {
     expect(page.hasNext).toBe(true);
     const last = LIST_HTML.replace(/<li><a href="javascript:gfnPageNaviClick\('[23]'\);">[23]<\/a><\/li>\s*/g, "");
@@ -71,6 +78,27 @@ describe("parseHansolList — 예외", () => {
   });
 });
 
+describe("parseHansolWorkplace", () => {
+  it("본문의 '근무지 :' 한 줄에서 지역을 읽는다", () => {
+    expect(parseHansolWorkplace("<p>&nbsp;&nbsp;근무지 : 경북 포항</p>")).toBe("경북");
+    expect(parseHansolWorkplace("<p>근무지: 서울 마포구 상암동</p>")).toBe("서울 마포구");
+    expect(parseHansolWorkplace("<p>근무지 : 서울특별시 강남구</p>")).toBe("서울 강남구");
+    expect(parseHansolWorkplace("<p>근무지 ： 마포구 상암동</p>")).toBe("서울 마포구");
+  });
+
+  it("근무지 줄이 없거나 지역을 알아볼 수 없으면 undefined", () => {
+    expect(parseHansolWorkplace("<p>급여처우 : 규정에 따름</p>")).toBeUndefined();
+    expect(parseHansolWorkplace("<p>근무지 : 해당 어린이집</p>")).toBeUndefined();
+    expect(parseHansolWorkplace("")).toBeUndefined();
+  });
+});
+
+describe("buildHansolDetailUrl", () => {
+  it("공고 번호로 상세 화면 주소를 만든다", () => {
+    expect(buildHansolDetailUrl("5773")).toBe(`${HANSOL_LIST_URL}?flg=view&mCurrent=2&sCurrent=3&empmn_sn=5773`);
+  });
+});
+
 describe("buildHansolUrl", () => {
   it("교사채용 목록에서 접수 중인 공고(STTUS=001)만 10건씩, 쪽 번호를 붙여 읽는다", () => {
     expect(buildHansolUrl(3)).toBe(`${HANSOL_LIST_URL}?flg=list&mCurrent=2&sCurrent=1&empmn_sn=&pageNum=3&listNum=10&STTUS=001`);
@@ -95,16 +123,22 @@ function ok(body: string): HttpResponse {
 
 type Route = (url: URL) => HttpResponse | Error;
 
-function fakeHttp(route: Route) {
+/** 상세 화면 본문. 근무지 한 줄만 있으면 된다 */
+const detailOf = (workplace: string) => ok(`<div class="view"><p>계약기간 : 2026-11-01</p><p>&nbsp;&nbsp;근무지 : ${workplace}</p><p>응시자격</p></div>`);
+
+/** 목록 요청은 route가, 상세 요청(flg=view)은 detail이 답한다. 상세 기본 응답은 근무지가 서울이다 */
+function fakeHttp(route: Route, detail: Route = () => detailOf("서울 마포구")) {
   const get = vi.fn(async (url: string) => {
-    const reply = route(new URL(url));
+    const parsed = new URL(url);
+    const reply = parsed.searchParams.get("flg") === "view" ? detail(parsed) : route(parsed);
     if (reply instanceof Error) throw reply;
     return reply;
   });
   return { http: { get } as HttpClient, get };
 }
 
-const listCalls = (get: ReturnType<typeof fakeHttp>["get"]) => get.mock.calls.map(([url]) => new URL(url)).filter((url) => url.pathname !== "/robots.txt");
+const listCalls = (get: ReturnType<typeof fakeHttp>["get"]) => get.mock.calls.map(([url]) => new URL(url)).filter((url) => url.searchParams.get("flg") === "list");
+const detailCalls = (get: ReturnType<typeof fakeHttp>["get"]) => get.mock.calls.map(([url]) => new URL(url)).filter((url) => url.searchParams.get("flg") === "view");
 const noRobots = (url: URL) => new HttpError("HTTP 404", 404, url.toString(), 1);
 const pageOf = (url: URL) => Number(url.searchParams.get("pageNum"));
 
@@ -145,6 +179,47 @@ describe("createHansolCollector", () => {
 
     await expect(createHansolCollector({ http }).fetchJobs()).rejects.toBeInstanceOf(CrawlNotAllowedError);
     expect(listCalls(get)).toHaveLength(0);
+  });
+
+  it("지역을 모르는 신입·담임 후보는 상세의 근무지에서 지역을 읽는다", async () => {
+    const route: Route = (url) => (url.pathname === "/robots.txt" ? noRobots(url) : ok(listHtml(1, 1, 100, 3)));
+    const { http, get } = fakeHttp(route, (url) => detailOf(url.searchParams.get("empmn_sn") === "101" ? "경북 포항" : "서울 마포구"));
+    const result = await createHansolCollector({ http }).fetchJobs();
+
+    expect(detailCalls(get).map((url) => url.searchParams.get("empmn_sn"))).toEqual(["100", "101", "102"]);
+    expect(result.jobs.map((job) => job.region)).toEqual(["서울 마포구", "경북", "서울 마포구"]);
+  });
+
+  it("후보가 아닌 공고(보조교사)와 제목에서 지역이 이미 나온 공고는 상세를 요청하지 않는다", async () => {
+    const rows = [
+      ["200", "시험어린이집 보조교사 채용공고"],
+      ["201", "[서울] 시험어린이집 담임교사 채용공고"],
+      ["202", "시험어린이집 담임교사 채용공고"],
+    ]
+      .map(([sn, title]) => `<tr><td>1</td><td>수시</td><td class="tl"><a href="javascript:fnView('${sn}', '001' );">${title}</a></td><td>2026-10-01 ~ 2099-12-31</td><td><img alt="접수중" /></td></tr>`)
+      .join("");
+    const html = `<table class="tblTypeA"><tbody>${rows}</tbody></table><div class="page_num"><ul><li class="on"><strong>1</strong></li></ul></div>`;
+    const { http, get } = fakeHttp((url) => (url.pathname === "/robots.txt" ? noRobots(url) : ok(html)));
+    const result = await createHansolCollector({ http }).fetchJobs();
+
+    expect(detailCalls(get).map((url) => url.searchParams.get("empmn_sn"))).toEqual(["202"]);
+    expect(Object.fromEntries(result.jobs.map((job) => [job.sourceId, job.region]))).toEqual({ "200": undefined, "201": "서울", "202": "서울 마포구" });
+  });
+
+  it("상세가 없거나(404) 서버 오류여도 그 공고만 지역 없음으로 두고 수집은 이어간다", async () => {
+    const route: Route = (url) => (url.pathname === "/robots.txt" ? noRobots(url) : ok(listHtml(1, 1, 100, 2)));
+    const detail: Route = (url) => (url.searchParams.get("empmn_sn") === "100" ? new HttpError("HTTP 404", 404, url.toString(), 1) : new HttpError("HTTP 503", 503, url.toString(), 4));
+    const { http } = fakeHttp(route, detail);
+    const result = await createHansolCollector({ http }).fetchJobs();
+
+    expect(result.jobs).toHaveLength(2);
+    expect(result.jobs.every((job) => job.region === undefined)).toBe(true);
+  });
+
+  it("상세에서 접근을 막으면(403) 우회하지 않고 수집이 실패한다", async () => {
+    const route: Route = (url) => (url.pathname === "/robots.txt" ? noRobots(url) : ok(listHtml(1, 1, 100, 2)));
+    const { http } = fakeHttp(route, (url) => new HttpError("HTTP 403", 403, url.toString(), 1));
+    await expect(createHansolCollector({ http }).fetchJobs()).rejects.toMatchObject({ status: 403 });
   });
 
   it("구조가 바뀐 응답은 수집 실패로 드러난다", async () => {
