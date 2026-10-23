@@ -1,3 +1,5 @@
+import { SEOUL_GU } from "../districts";
+
 /** 시·도 이름을 짧은 표기로 맞춘다 (PRD 예: "서울 강서구") */
 const PROVINCES: Record<string, string> = {
   서울특별시: "서울",
@@ -71,11 +73,9 @@ export function normalizeRegion(raw: string | undefined | null): string | undefi
   return district ? `${province} ${district}` : province;
 }
 
-/** 시·도 이름이 구 이름만으로는 정해지지 않는 곳(강서구는 부산에도, 중구는 여러 시에 있다)은 뺀 서울의 구 */
-const SEOUL_DISTRICTS = [
-  "강남구", "강동구", "강북구", "관악구", "광진구", "구로구", "금천구", "노원구", "도봉구", "동대문구", "동작구", "마포구",
-  "서대문구", "서초구", "성동구", "성북구", "송파구", "양천구", "영등포구", "용산구", "은평구", "종로구", "중랑구",
-];
+/** 구 이름만으로는 서울이라고 정할 수 없는 구. 강서구는 부산에도, 중구는 여러 시에도 있다 */
+const AMBIGUOUS_GU: readonly string[] = ["강서구", "중구"];
+const SEOUL_ONLY_DISTRICTS = SEOUL_GU.filter((name) => !AMBIGUOUS_GU.includes(name));
 
 /**
  * 지역 칸이 없는 출처(한솔·삼성·푸르니)의 제목·어린이집명에서 서울을 읽는다. 글자로 분명히 적혀 있을 때만 읽고 추측하지 않는다.
@@ -85,7 +85,7 @@ const SEOUL_DISTRICTS = [
  */
 export function inferRegion(text: string | undefined | null): string | undefined {
   if (!text) return undefined;
-  const district = SEOUL_DISTRICTS.find((name) => text.includes(name));
+  const district = SEOUL_ONLY_DISTRICTS.find((name) => text.includes(name));
   if (district) return `서울 ${district}`;
   return text.includes("서울") ? "서울" : undefined;
 }

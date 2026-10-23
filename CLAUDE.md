@@ -13,7 +13,8 @@
 
 ## 구조
 
-- `app/page.tsx` 피드(서버에서 첫 20건을 `use cache`로 조회), `app/api/jobs` 다음 페이지, `app/api/cron/[source]` 수집 엔드포인트
+- `app/page.tsx` 피드(서버에서 첫 20건과 구별 건수를 `use cache`로 조회), `app/api/jobs` 다음 페이지(`?gu=마포구&gu=서대문구`처럼 서울의 구를 여러 번 쓰면 그 구의 공고만, 서울의 구가 아닌 값은 400), `app/api/cron/[source]` 수집 엔드포인트
+- **서울 구별 필터**: `components/DistrictFilter.tsx`(SEED `Chip.Toggle`, 헤더 아래에 붙는 가로 스크롤 칩, 여러 구 선택, 칩 높이 44px)와 `components/Feed.tsx`가 상태를 다룬다. 구 이름은 `lib/districts.ts`의 `SEOUL_GU`(25개)이고 공고의 `region`("서울 마포구")과 맞춘다. `get_feed` SQL은 지역 조건을 받지 못해서(바꾸면 마이그레이션을 따로 적용해야 한다) `lib/jobs.ts`의 `fetchFilteredPage`가 최신순으로 100건씩(최대 10번) 훑으며 선택한 구만 모은다. 칩의 숫자는 `fetchDistrictCounts`가 같은 방식으로 센 것이고 첫 화면 캐시에 함께 들어간다. 구를 모르는 공고(region이 "서울"뿐)는 "전체"에서만 보인다. 고른 구는 `localStorage`(`boyuk:districts`)에 기억했다가 열 때 다시 건다(서버가 그린 첫 화면 뒤에 적용해 잠깐 전체가 보일 수 있다). 선택을 풀면 서버가 만든 첫 화면으로 돌아간다.
 - `lib/collectors/` 소스별 수집기. 고용24(`work24.ts`, XML)와 사람인(`saramin.ts`, JSON), 서울시육아종합지원센터(`seoul-center.ts`)·모아맘(`moamam.ts`)·한솔(`hansol.ts`)·푸르니(`puruni.ts`)·삼성(`samsung.ts`) 크롤러(HTML)까지 일곱 소스가 모두 구현됐다(아직 만들지 못한 소스는 `implemented: false`로 두면 501을 돌려준다). 등록은 `lib/collectors/index.ts`
   - 공통 도구: `http.ts`(시간 초과·재시도·호출 간격·키 가리기), `dates.ts`, `region.ts`, `url.ts`(http(s)만 허용), `config.ts`(검색어·지역·사람인 하루 예산)
   - 크롤러 공통 규칙: 실행할 때마다 `robots.ts`의 `assertRobotsAllows`로 robots.txt를 확인하고, 막혀 있으면 목록을 한 번도 요청하지 않고 `CrawlNotAllowedError`로 실패한다. 요청 사이는 2초, User-Agent는 `boyuk-collector/0.1 (+저장소 주소)`다. 제목·어린이집명·지역·마감일·원문 링크만 저장하고, 담당자 연락처 같은 개인정보는 가져오지 않는다. 상세 페이지는 읽지 않는다(한솔·삼성만 서울 여부를 확인하려고 신입·담임 후보의 상세를 연다). HTML 시험 자료(`__fixtures__/*.html`)는 사이트 내용을 복제하지 않도록 구조만 따른 지어낸 값이다.
@@ -46,7 +47,7 @@
 
 - 프로젝트 `minseoks/boyuk`, 주소 `https://boyuk.vercel.app`. GitHub `main`에 푸시하면 자동 배포된다. 로컬에는 `.vercel` 연결이 없어서 CLI는 `--project boyuk --scope minseoks`를 붙인다.
 - **Vercel에 환경변수를 넣어야 실제 공고가 보인다.** 없으면 피드가 샘플 데이터로 동작하고 화면에 "샘플 공고예요" 안내가 뜬다(2026-10-23에 이 상태로 배포되어 있었다). 필요한 것: `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, `CRON_SECRET`(Production). 고용24·사람인 키는 쓸 수 있게 되면 `WORK24_API_KEY`·`SARAMIN_API_KEY`를 더한다. 환경변수를 바꾼 뒤에는 다시 배포해야 반영된다.
-- `vercel.json`의 `crons`가 하루 한 번 수집 엔드포인트를 부른다(UTC 21:00~21:30 = 한국 시간 새벽 6:00~6:30, 서울센터 → 한솔 → 푸르니 → 삼성 순으로 10분 간격). Hobby는 정확한 시각이 아니라 그 시각이 속한 시간대 안에서 ±59분 오차로 실행된다. Vercel이 `CRON_SECRET`을 `Authorization: Bearer`로 붙여 주고, 경로 처리기(`app/api/cron/[source]/route.ts`)가 확인한다. 수집이 성공하면 첫 화면 캐시를 바로 무효화하므로 새 공고는 수집 직후 첫 방문부터 보인다. 고용24·사람인은 키를 쓸 수 있게 되면, 모아맘은 인증서 문제를 풀면 더한다. Hobby는 크론을 하루 한 번보다 자주 돌릴 수 없다(더 자주 돌리려면 Pro가 필요하다). 지금 바로 한 번 돌리려면 `CRON_SECRET`을 붙여 엔드포인트를 직접 부른다.
+- `vercel.json`의 `crons`가 **하루 두 번** 수집 엔드포인트를 부른다. 새벽(UTC 21:00~21:30 = 한국 시간 6:00~6:30)과 점심(UTC 03:00~03:30 = 한국 시간 12:00~12:30)이고, 각각 서울센터 → 한솔 → 푸르니 → 삼성 순으로 10분 간격이다. 점심 줄은 `?slot=noon`을 붙인 같은 경로다(Hobby는 한 줄이 하루 한 번만 돌 수 있어서 시각만 다른 줄을 하나 더 둔다. 경로 처리기는 쿼리를 쓰지 않는다). Hobby는 정확한 시각이 아니라 그 시각이 속한 시간대 안에서 ±59분 오차로 실행된다. Vercel이 `CRON_SECRET`을 `Authorization: Bearer`로 붙여 주고, 경로 처리기(`app/api/cron/[source]/route.ts`)가 확인한다. 수집이 성공하면 첫 화면 캐시를 바로 무효화하므로 새 공고는 수집 직후 첫 방문부터 보인다. 고용24·사람인은 키를 쓸 수 있게 되면, 모아맘은 인증서 문제를 풀면 두 번 모두 더한다. 시각을 바꾸거나 소스를 더할 때는 `vercel.json`의 줄을 고친다(크론은 하루 한 번보다 촘촘히 돌릴 수 없고, 더 자주 돌리려면 Pro가 필요하다). 지금 바로 한 번 돌리려면 `CRON_SECRET`을 붙여 엔드포인트를 직접 부른다.
 
 ## SEED Design
 

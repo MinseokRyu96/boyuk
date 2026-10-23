@@ -3,6 +3,10 @@
     { "path": "/api/cron/seoul-center", "schedule": "0 21 * * *" },
     { "path": "/api/cron/hansol", "schedule": "10 21 * * *" },
     { "path": "/api/cron/purunee", "schedule": "20 21 * * *" },
-    { "path": "/api/cron/samsung", "schedule": "30 21 * * *" }
+    { "path": "/api/cron/samsung", "schedule": "30 21 * * *" },
+    { "path": "/api/cron/seoul-center?slot=noon", "schedule": "0 3 * * *" },
+    { "path": "/api/cron/hansol?slot=noon", "schedule": "10 3 * * *" },
+    { "path": "/api/cron/purunee?slot=noon", "schedule": "20 3 * * *" },
+    { "path": "/api/cron/samsung?slot=noon", "schedule": "30 3 * * *" }
   ]
 }
