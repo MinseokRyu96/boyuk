@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head><meta charset="utf-8"><title>채용공고 (시험용 축약본)</title></head>
+<body>
+<!--
+  푸르니 교직원 채용시스템 채용공고 목록(/recruit/notice)의 줄 모양을 그대로 따라 만든 시험용 축약본이다 (2026-10-23 실제 응답과 대조).
+  어린이집 이름과 공고 번호는 지어낸 값이다. 실제 공고 내용을 저장소에 복제하지 않기 위해서다.
+  - 쪽 이동은 목록 아래 .pager의 번호 링크이고, 현재 쪽은 class="on"이다. 여러 쪽일 때의 모양은 가정한 것이다
+-->
+<div class="content">
+    <h1 class="title">채용공고</h1>
+    <table cellpadding="0" cellspacing="0" border="0" class="recruit-bbs">
+        <thead>
+        <tr><td>제목</td><td>접수기간</td></tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td>
+                    <a href="#" onClick="pageView(1, 9400004);">[서울마포] 가나다어린이집 육아대체교사모집</a>
+                    &nbsp;<span class='i-new'>N</span>
+                </td>
+                <td>2026-10-23 ~ 2026-10-31</td>
+            </tr>
+            <tr>
+                <td>
+                    <a href="#" onClick="pageView(1, 9400003);">[서대문구] 라마바 어린이집 교사모집</a>
+                    &nbsp;<span class='i-new'>N</span>
+                </td>
+                <td>2026-10-20 ~ 2026-10-25</td>
+            </tr>
+            <tr>
+                <td>
+                    <a href="#" onClick="pageView(1, 9400002);">[경기수원] 사아자어린이집 담임교사 채용</a>
+                </td>
+                <td>2026-10-15 ~ 2026-11-14</td>
+            </tr>
+            <tr>
+                <td>
+                    <a href="#" onClick="pageView(1, 9400001);">차카타어린이집(직장) 신입 보육교사 모집</a>
+                </td>
+                <td>2026-10-10 ~ 2026-10-30</td>
+            </tr>
+        </tbody>
+    </table>
+    <div class="pager">
+        <a href="javascript:pageSubmit(1);" class="first"><i class="icon-left-open-big"></i></a>
+        <a href="javascript:pageSubmit(1);" class="prev"><i class="icon-left-open-mini"></i></a>
+        <a href="javascript:pageSubmit(1)" class="on" style="background-color: #829DCB;">1</a>
+        <a href="javascript:pageSubmit(2)">2</a>
+        <a href="javascript:pageSubmit(2);" class="next"><i class="icon-right-open-mini"></i></a>
+        <a href="javascript:pageSubmit(2);" class="last"><i class="icon-right-open-big"></i></a>
+    </div>
+</div>
+</body>
+</html>

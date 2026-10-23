@@ -4,6 +4,7 @@ import { parseLooseDate } from "./dates";
 import type { HttpClient } from "./http";
 import { normalizeRegion } from "./region";
 import { assertRobotsAllows } from "./robots";
+import { orgNameFromTitle } from "./title";
 import type { CollectResult, Collector, RawJob } from "./types";
 
 /*
@@ -35,21 +36,8 @@ function clean(value: string | undefined): string | undefined {
   return text === "" ? undefined : text;
 }
 
-/** 제목 앞머리의 "[정기] [전국]" 같은 대괄호 표시를 떼어 낸다 */
-const BRACKETS = /\[[^\]]*\]/g;
 /** 지원 방법을 알리는 공지 줄("[필독] … 안내 및 유의사항")은 채용 공고가 아니다 */
 const NOTICE_ONLY = /\[필독\]|유의사항/;
-
-/**
- * 제목에서 어린이집 이름을 꺼낸다: 대괄호와 앞의 연도를 뺀 맨 앞에서 첫 "…어린이집"까지.
- * 어린이집 이름이 없거나("2027년 보육교사 정기채용"), 채용 문구가 섞여 이름이 아닌 것 같으면 undefined.
- */
-export function orgNameFromTitle(title: string): string | undefined {
-  const text = title.replace(BRACKETS, " ").replace(/^\s*20\d{2}\s*(?:년도?)?\s+/, "");
-  // 이름 뒤에는 공백이나 괄호가 온다 ("…어린이집(출산 및 육아휴직) 대체교사")
-  const name = /^\s*(\S.*?어린이집)(?=[\s(（]|$)/.exec(text)?.[1];
-  return name && !/채용|모집|공고/.test(name) ? name : undefined;
-}
 
 /** 제목의 대괄호 중 시·도로 읽히는 첫 값을 지역으로 쓴다 ("[전국]"은 지역이 아니라서 건너뛴다) */
 function regionFromTitle(title: string): string | undefined {

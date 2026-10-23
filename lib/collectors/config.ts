@@ -49,3 +49,6 @@ export const MOAMAM_MAX_PAGES = 10;
  * 접수 중인 공고만 받아서 이 상한에 걸리지 않는 한 목록 전체를 본 것으로 처리한다.
  */
 export const HANSOL_MAX_PAGES = 15;
+
+/** 푸르니 채용공고는 접수 중인 공고만 올라와서 한두 쪽이면 끝난다. 이 값은 그래도 끝나지 않을 때의 안전 상한이다 */
+export const PURUNI_MAX_PAGES = 5;
