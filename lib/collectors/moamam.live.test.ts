@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { isTarget } from "../normalize";
-import { createHttpClient } from "./http";
 import { createMoamamCollector } from "./moamam";
+import { createMoamamHttpClient } from "./moamam-http";
 
 /*
  * 실제 모아맘 채용사이트를 대상으로 구조가 그대로인지 확인한다. 기본 `npm test`에서는 건너뛴다.
@@ -13,7 +13,7 @@ const enabled = process.env.LIVE_TESTS === "1";
 
 describe.skipIf(!enabled)("모아맘 수집기 — 실제 사이트 (읽기만)", () => {
   it("robots.txt가 허용하고, 두 게시판의 첫 쪽을 공통 형식으로 읽는다", async () => {
-    const collector = createMoamamCollector({ http: createHttpClient({ minIntervalMs: 2000 }), maxPages: 1 });
+    const collector = createMoamamCollector({ http: createMoamamHttpClient(), maxPages: 1 });
     const { jobs, complete } = await collector.fetchJobs();
 
     expect(complete).toBe(false); // 첫 쪽만 읽었다

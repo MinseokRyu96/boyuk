@@ -2,6 +2,7 @@ import { CRON_SLUGS, type SourceCode } from "../sources";
 import { createHansolCollector } from "./hansol";
 import { createHttpClient } from "./http";
 import { createMoamamCollector } from "./moamam";
+import { createMoamamHttpClient } from "./moamam-http";
 import { createPuruniCollector } from "./puruni";
 import { createSamsungCollector } from "./samsung";
 import { createSaraminCollector } from "./saramin";
@@ -21,7 +22,7 @@ const COLLECTORS: Record<SourceCode, Collector> = {
   saramin: createSaraminCollector({ getAccessKey: () => process.env.SARAMIN_API_KEY, http: createHttpClient({ minIntervalMs: 1500 }) }),
   // 크롤러는 사이트에 부담을 주지 않도록 요청 사이를 2초 띄운다
   seoul_center: createSeoulCenterCollector({ http: createHttpClient({ minIntervalMs: 2000 }) }),
-  moamam: createMoamamCollector({ http: createHttpClient({ minIntervalMs: 2000 }) }),
+  moamam: createMoamamCollector({ http: createMoamamHttpClient() }),
   // 푸르니는 robots.txt가 전체 금지다. 소수 지인용 비영리 서비스라는 사용자의 판단으로 이 사이트만 robots.txt를 무시한다.
   // 끄려면 ignoreRobotsTxt를 지우면 된다(그러면 수집이 CrawlNotAllowedError로 멈춘다). 자세한 이유는 puruni.ts 머리 주석.
   purunee: createPuruniCollector({ http: createHttpClient({ minIntervalMs: 2000 }), ignoreRobotsTxt: true }),

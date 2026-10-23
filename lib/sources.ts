@@ -44,7 +44,7 @@ export function parseSources(values: readonly string[]): SourceCode[] | null {
  * 지금 크론(vercel.json)이 수집하는 출처. 플랫폼 필터에서는 공고가 0건이어도 칩을 보여 줘서
  * "수집은 하는데 지금 공고가 없는 것"과 "수집하지 않는 것"을 구분한다. 크론을 바꾸면 이 목록도 맞춘다.
  */
-export const ACTIVE_SOURCES: readonly SourceCode[] = ["seoul_center", "hansol", "purunee", "samsung"];
+export const ACTIVE_SOURCES: readonly SourceCode[] = ["seoul_center", "hansol", "purunee", "samsung", "moamam"];
 
 export function sourceLabel(code: string): string {
   return code in SOURCES ? SOURCES[code as SourceCode].label : code;
