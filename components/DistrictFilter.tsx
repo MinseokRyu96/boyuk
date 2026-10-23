@@ -1,13 +1,14 @@
 "use client";
 
 import { Chip } from "seed-design/ui/chip";
-import { SEOUL_GU, type DistrictCounts, type SeoulGu } from "@/lib/districts";
+import { SEOUL_GU, type SeoulGu } from "@/lib/districts";
+import type { FeedCounts } from "@/lib/types";
 
 /** SEED 칩의 가장 큰 크기(large)가 40px이라, 터치 영역 기준(44px)에 맞추려고 높이를 키운다 */
 const CHIP_CLASS = "min-h-11";
 
 type Props = {
-  counts: DistrictCounts;
+  counts: FeedCounts;
   selected: readonly SeoulGu[];
   onChange: (next: SeoulGu[]) => void;
 };

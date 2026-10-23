@@ -1,6 +1,6 @@
 import { cacheLife, cacheTag } from "next/cache";
 import { FEED_TAG } from "./feed-cache";
-import { fetchDistrictCounts, fetchFeedPage, fetchLastCollectedAt, isSampleMode } from "./jobs";
+import { fetchFeedCounts, fetchFeedPage, fetchLastCollectedAt, isSampleMode } from "./jobs";
 
 /**
  * 피드 첫 화면 데이터. 수집은 하루 몇 번뿐이라 몇 분 캐시해도 화면이 달라지지 않고,
@@ -12,10 +12,10 @@ export async function getFirstPage() {
   cacheTag(FEED_TAG);
 
   const now = new Date();
-  const [page, updatedAt, districtCounts] = await Promise.all([
+  const [page, updatedAt, counts] = await Promise.all([
     fetchFeedPage(null, now),
     fetchLastCollectedAt(now),
-    fetchDistrictCounts(now),
+    fetchFeedCounts(now),
   ]);
-  return { page, updatedAt, districtCounts, serverNow: now.toISOString(), isSample: isSampleMode() };
+  return { page, updatedAt, counts, serverNow: now.toISOString(), isSample: isSampleMode() };
 }

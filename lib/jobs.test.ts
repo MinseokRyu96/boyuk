@@ -18,10 +18,15 @@ const rpc = vi.fn(async (name: string, args: { p_cursor_at: string | null; p_cur
 let client: unknown = { rpc };
 vi.mock("./supabase", () => ({ getPublicClient: () => client }));
 
-const { fetchDistrictCounts, fetchFeedPage, fetchMapData } = await import("./jobs");
+const { fetchFeedCounts, fetchFeedPage, fetchMapData } = await import("./jobs");
 
 /** i번째로 최신인 공고. 구는 guOf(i)로 정한다 */
-function makeRows(count: number, guOf: (i: number) => string | null, deadlineOf: (i: number) => string | null = () => "2099-12-31"): FeedRow[] {
+function makeRows(
+  count: number,
+  guOf: (i: number) => string | null,
+  deadlineOf: (i: number) => string | null = () => "2099-12-31",
+  sourcesOf: (i: number) => string[] = () => ["seoul_center"],
+): FeedRow[] {
   return Array.from({ length: count }, (_, i) => {
     const gu = guOf(i);
     return {
@@ -32,7 +37,7 @@ function makeRows(count: number, guOf: (i: number) => string | null, deadlineOf:
       url: `https://example.com/${i}`,
       deadline: deadlineOf(i),
       is_workplace: false,
-      sources: ["seoul_center"],
+      sources: sourcesOf(i),
       first_seen_at: new Date(Date.UTC(2026, 9, 1) - i * 60_000).toISOString(),
     };
   });
@@ -63,7 +68,7 @@ describe("fetchFeedPage — 구 필터", () => {
   it("선택한 구의 공고만 20건씩 모으고, 훑은 자리가 아니라 마지막으로 돌려준 공고에서 이어 읽는다", async () => {
     // 3건 중 1건이 마포구(대략 60건), 나머지는 은평구·구를 모르는 공고
     rows = makeRows(180, (i) => (i % 3 === 0 ? "마포구" : i % 3 === 1 ? "은평구" : ""));
-    const first = await fetchFeedPage(null, NOW, ["마포구"]);
+    const first = await fetchFeedPage(null, NOW, { districts: ["마포구"] });
 
     expect(first.cards).toHaveLength(20);
     expect(first.cards.every((card) => card.region === "서울 마포구")).toBe(true);
@@ -71,14 +76,14 @@ describe("fetchFeedPage — 구 필터", () => {
     expect(first.cards[19].key).toBe("k0057");
     expect(decodeCursor(first.nextCursor!)?.key).toBe("k0057");
 
-    const second = await fetchFeedPage(decodeCursor(first.nextCursor!), NOW, ["마포구"]);
+    const second = await fetchFeedPage(decodeCursor(first.nextCursor!), NOW, { districts: ["마포구"] });
     expect(second.cards[0].key).toBe("k0060"); // 겹치거나 빠지는 공고가 없다
     expect(second.cards).toHaveLength(20);
   });
 
   it("끝까지 훑었으면 다음 커서가 없고, 선택한 구가 여럿이면 합쳐서 최신순으로 돌려준다", async () => {
     rows = makeRows(40, (i) => (i % 4 === 0 ? "마포구" : i % 4 === 1 ? "서대문구" : "은평구"));
-    const page = await fetchFeedPage(null, NOW, ["마포구", "서대문구"]);
+    const page = await fetchFeedPage(null, NOW, { districts: ["마포구", "서대문구"] });
 
     expect(page.cards.map((card) => card.key)).toEqual(
       rows.filter((r) => r.region === "서울 마포구" || r.region === "서울 서대문구").map((r) => r.group_key),
@@ -88,31 +93,26 @@ describe("fetchFeedPage — 구 필터", () => {
 
   it("해당하는 공고가 하나도 없으면 빈 목록과 null 커서", async () => {
     rows = makeRows(30, () => "은평구");
-    expect(await fetchFeedPage(null, NOW, ["마포구"])).toEqual({ cards: [], nextCursor: null });
+    expect(await fetchFeedPage(null, NOW, { districts: ["마포구"] })).toEqual({ cards: [], nextCursor: null, total: 0 });
   });
 
   it("구를 모르는 공고(지역이 '서울'뿐이거나 없음)는 구를 고르면 걸러진다", async () => {
     rows = makeRows(10, (i) => (i < 5 ? "" : i < 8 ? null : "마포구"));
-    const page = await fetchFeedPage(null, NOW, ["마포구"]);
+    const page = await fetchFeedPage(null, NOW, { districts: ["마포구"] });
     expect(page.cards).toHaveLength(2);
   });
 
-  it("훑는 상한(1,000건)에 걸리면 이번 응답이 비어 있어도 훑은 자리에서 이어 읽을 커서를 준다", async () => {
+  it("훑는 상한(1,000건)을 넘는 공고는 구 필터 결과에서 빠진다 (이어 읽는 커서는 없다)", async () => {
     rows = makeRows(1500, (i) => (i >= 1200 ? "마포구" : "은평구"));
-    const first = await fetchFeedPage(null, NOW, ["마포구"]);
+    const page = await fetchFeedPage(null, NOW, { districts: ["마포구"] });
 
-    expect(first.cards).toHaveLength(0);
+    expect(page).toMatchObject({ cards: [], nextCursor: null, total: 0 });
     expect(rpc).toHaveBeenCalledTimes(10);
-    expect(decodeCursor(first.nextCursor!)?.key).toBe("k0999");
-
-    const next = await fetchFeedPage(decodeCursor(first.nextCursor!), NOW, ["마포구"]);
-    expect(next.cards).toHaveLength(20);
-    expect(next.cards[0].key).toBe("k1200");
   });
 
   it("DB 오류는 그대로 던진다", async () => {
     client = { rpc: async () => ({ data: null, error: { message: "boom" } }) };
-    await expect(fetchFeedPage(null, NOW, ["마포구"])).rejects.toThrow(/boom/);
+    await expect(fetchFeedPage(null, NOW, { districts: ["마포구"] })).rejects.toThrow(/boom/);
   });
 });
 
@@ -122,7 +122,7 @@ describe("fetchFeedPage — 마감일 정렬", () => {
 
   it("임박순은 공고 전체를 마감일 순으로 정렬해 20건씩 돌려주고, 상시채용은 맨 뒤다", async () => {
     rows = makeRows(60, () => "마포구", deadlineOf);
-    const first = await fetchFeedPage(null, NOW, [], "soon");
+    const first = await fetchFeedPage(null, NOW, {}, "soon");
     expect(first.cards).toHaveLength(20);
     expect(rpc).toHaveBeenCalledTimes(1); // 60건이라 100건씩 한 번이면 다 모인다
 
@@ -131,7 +131,7 @@ describe("fetchFeedPage — 마감일 정렬", () => {
     let page = first;
     seen.push(...page.cards.map((card) => card.key));
     while (page.nextCursor) {
-      page = await fetchFeedPage(decodeCursor(page.nextCursor), NOW, [], "soon");
+      page = await fetchFeedPage(decodeCursor(page.nextCursor), NOW, {}, "soon");
       seen.push(...page.cards.map((card) => card.key));
     }
     expect(seen).toHaveLength(60);
@@ -144,14 +144,14 @@ describe("fetchFeedPage — 마감일 정렬", () => {
 
   it("늦은순은 마감일이 늦은 순이다", async () => {
     rows = makeRows(30, () => "마포구", deadlineOf);
-    const page = await fetchFeedPage(null, NOW, [], "late");
+    const page = await fetchFeedPage(null, NOW, {}, "late");
     const deadlines = page.cards.map((card) => rows.find((r) => r.group_key === card.key)!.deadline).filter((d): d is string => d !== null);
     expect(deadlines).toEqual([...deadlines].sort().reverse());
   });
 
   it("구 필터와 함께 쓰면 선택한 구의 공고만 정렬한다", async () => {
     rows = makeRows(120, (i) => (i % 2 === 0 ? "마포구" : "은평구"), deadlineOf);
-    const page = await fetchFeedPage(null, NOW, ["은평구"], "soon");
+    const page = await fetchFeedPage(null, NOW, { districts: ["은평구"] }, "soon");
     expect(page.cards.every((card) => card.region === "서울 은평구")).toBe(true);
     expect(page.cards).toHaveLength(20);
     expect(rpc).toHaveBeenCalledTimes(2); // 120건을 100건씩 두 번 모은다
@@ -159,13 +159,13 @@ describe("fetchFeedPage — 마감일 정렬", () => {
 
   it("한 번의 요청이 훑는 상한(1,000건)을 넘는 공고는 정렬 대상에서 빠진다", async () => {
     rows = makeRows(1200, () => "마포구", deadlineOf);
-    await fetchFeedPage(null, NOW, [], "soon");
+    await fetchFeedPage(null, NOW, {}, "soon");
     expect(rpc).toHaveBeenCalledTimes(10);
   });
 
   it("Supabase가 없을 때(샘플)도 같은 규칙으로 정렬한다", async () => {
     client = null;
-    const page = await fetchFeedPage(null, NOW, [], "soon");
+    const page = await fetchFeedPage(null, NOW, {}, "soon");
     expect(page.cards).toHaveLength(20);
     // 마감일 정렬의 커서(마감일을 담은 세 값)로 이어진다. 정렬 규칙 자체는 sort.test.ts가 시험한다
     expect(decodeCursor(page.nextCursor!)?.deadline).toBeDefined();
@@ -185,7 +185,7 @@ describe("fetchMapData", () => {
 
   it("선택한 구의 공고만 돌려주고, 100건씩 여러 번 읽어 모은다", async () => {
     rows = makeRows(250, (i) => (i % 2 === 0 ? "마포구" : "은평구")).map((row) => ({ ...row, lat: 37.5, lng: 126.9 }));
-    const data = await fetchMapData(NOW, ["은평구"]);
+    const data = await fetchMapData(NOW, { districts: ["은평구"] });
 
     expect(data.total).toBe(125);
     expect(data.points).toHaveLength(125);
@@ -206,13 +206,93 @@ describe("fetchMapData", () => {
   });
 });
 
-describe("fetchDistrictCounts", () => {
+describe("fetchFeedPage — 플랫폼(출처) 필터", () => {
+  /** 4건마다 순서대로 서울센터·한솔·삼성, 그리고 서울센터와 푸르니에 함께 올라온 공고 */
+  const sourcesOf = (i: number) => [["seoul_center"], ["hansol"], ["samsung"], ["seoul_center", "purunee"]][i % 4];
+
+  it("고른 출처의 공고만 돌려주고, 조건에 맞는 전체 건수(total)를 함께 준다", async () => {
+    rows = makeRows(40, () => "마포구", undefined, sourcesOf);
+    const page = await fetchFeedPage(null, NOW, { sources: ["hansol"] });
+
+    expect(page.cards).toHaveLength(10);
+    expect(page.total).toBe(10);
+    expect(page.nextCursor).toBeNull();
+    expect(page.cards.every((card) => card.sources.some((s) => s.code === "hansol"))).toBe(true);
+  });
+
+  it("출처를 여럿 고르면 그중 하나라도 있는 공고를 합치고, 여러 출처에 걸친 공고는 한 번만 나온다", async () => {
+    rows = makeRows(40, () => "마포구", undefined, sourcesOf);
+    const page = await fetchFeedPage(null, NOW, { sources: ["seoul_center", "purunee"] });
+
+    expect(page.total).toBe(20); // 서울센터만 10건 + 서울센터·푸르니 함께 10건 (중복 없이)
+    expect(new Set(page.cards.map((card) => card.key)).size).toBe(page.cards.length);
+    expect(page.cards).toHaveLength(20);
+  });
+
+  it("구와 출처를 함께 걸면 둘 다 만족하는 공고만, 20건씩 이어 읽는다", async () => {
+    // 마포구 공고 60건 중 절반은 한솔
+    rows = makeRows(120, (i) => (i % 2 === 0 ? "마포구" : "은평구"), undefined, (i) => (i % 4 === 0 ? ["hansol"] : ["seoul_center"]));
+    const first = await fetchFeedPage(null, NOW, { districts: ["마포구"], sources: ["hansol"] });
+
+    expect(first.total).toBe(30);
+    expect(first.cards).toHaveLength(20);
+    expect(first.cards.every((card) => card.region === "서울 마포구")).toBe(true);
+    const second = await fetchFeedPage(decodeCursor(first.nextCursor!), NOW, { districts: ["마포구"], sources: ["hansol"] });
+    expect(second.cards).toHaveLength(10);
+    expect(second.nextCursor).toBeNull();
+  });
+
+  it("마감일 정렬과도 함께 쓴다", async () => {
+    rows = makeRows(40, () => "마포구", (i) => `2026-11-${String(1 + (i % 28)).padStart(2, "0")}`, sourcesOf);
+    const page = await fetchFeedPage(null, NOW, { sources: ["samsung"] }, "soon");
+
+    expect(page.total).toBe(10);
+    const deadlines = page.cards.map((card) => rows.find((r) => r.group_key === card.key)!.deadline!);
+    expect(deadlines).toEqual([...deadlines].sort());
+  });
+
+  it("해당 출처의 공고가 없으면 빈 목록과 total 0", async () => {
+    rows = makeRows(10, () => "마포구");
+    expect(await fetchFeedPage(null, NOW, { sources: ["samsung"] })).toEqual({ cards: [], nextCursor: null, total: 0 });
+  });
+
+  it("필터도 정렬도 없는 기본 화면은 DB를 한 번만 읽고 total을 계산하지 않는다", async () => {
+    rows = makeRows(50, () => "마포구");
+    const page = await fetchFeedPage(null, NOW);
+    expect(rpc).toHaveBeenCalledTimes(1);
+    expect(page.total).toBeUndefined();
+  });
+
+  it("Supabase가 없을 때(샘플)도 출처 필터가 걸린다", async () => {
+    client = null;
+    const page = await fetchFeedPage(null, NOW, { sources: ["samsung"] });
+    expect(page.total).toBeGreaterThan(0);
+    expect(page.cards.every((card) => card.sources.some((s) => s.code === "samsung"))).toBe(true);
+  });
+});
+
+describe("fetchFeedCounts", () => {
   it("구별 건수와 전체 건수를 센다 (100건씩 여러 번 훑는다)", async () => {
     rows = makeRows(250, (i) => (i % 5 === 0 ? "마포구" : i % 5 === 1 ? "은평구" : i % 5 === 2 ? "" : "중구"));
-    const counts = await fetchDistrictCounts(NOW);
+    const counts = await fetchFeedCounts(NOW);
 
-    expect(counts).toEqual({ total: 250, byDistrict: { 마포구: 50, 은평구: 50, 중구: 100 } });
+    expect(counts).toEqual({ total: 250, byDistrict: { 마포구: 50, 은평구: 50, 중구: 100 }, bySource: { seoul_center: 250 } });
     expect(rpc).toHaveBeenCalledTimes(3);
+  });
+});
+
+describe("fetchFeedCounts — 출처별", () => {
+  it("출처마다 센다: 여러 출처에 올라온 공고는 출처마다 한 건씩 세서 합이 전체보다 클 수 있다", async () => {
+    rows = makeRows(8, () => "마포구", undefined, (i) => (i % 4 === 3 ? ["seoul_center", "purunee"] : i % 4 === 2 ? ["samsung"] : ["seoul_center"]));
+    const counts = await fetchFeedCounts(NOW);
+
+    expect(counts.total).toBe(8);
+    expect(counts.bySource).toEqual({ seoul_center: 6, purunee: 2, samsung: 2 });
+  });
+
+  it("알 수 없는 출처 코드는 세지 않는다", async () => {
+    rows = makeRows(2, () => "마포구", undefined, () => ["naver"]);
+    expect((await fetchFeedCounts(NOW)).bySource).toEqual({});
   });
 });
 
@@ -220,7 +300,7 @@ describe("Supabase가 없을 때(샘플 데이터)", () => {
   it("구 필터도 샘플 공고에 같은 규칙으로 걸린다", async () => {
     client = null;
     const all = await fetchFeedPage(null, NOW);
-    const filtered = await fetchFeedPage(null, NOW, ["강서구"]);
+    const filtered = await fetchFeedPage(null, NOW, { districts: ["강서구"] });
 
     expect(all.cards.length).toBe(20);
     expect(filtered.cards.length).toBeGreaterThan(0);

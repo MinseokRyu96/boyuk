@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ActionButton } from "seed-design/ui/action-button";
 import type { SeoulGu } from "@/lib/districts";
+import type { SourceCode } from "@/lib/sources";
 import { loadKakaoMaps, type KakaoClusterer, type KakaoMapInstance, type KakaoMapsApi, type KakaoMarker } from "@/lib/kakao-sdk";
 import type { MapData, MapPoint } from "@/lib/types";
 import { JobCard } from "./JobCard";
@@ -13,6 +14,8 @@ type Props = {
   appKey: string;
   /** 고른 구. 비어 있으면 서울 전체 */
   districts: readonly SeoulGu[];
+  /** 고른 플랫폼(수집 출처). 비어 있으면 모든 플랫폼 */
+  sources: readonly SourceCode[];
   /** "목록으로 보기" 누를 때 */
   onShowList: () => void;
 };
@@ -20,9 +23,10 @@ type Props = {
 /** 서울시청 근처. 찍을 공고가 없을 때의 지도 중심 */
 const SEOUL_CENTER = { lat: 37.5665, lng: 126.978 };
 
-async function requestMapData(districts: readonly SeoulGu[]): Promise<MapData> {
+async function requestMapData(districts: readonly SeoulGu[], sources: readonly SourceCode[]): Promise<MapData> {
   const params = new URLSearchParams();
   for (const gu of districts) params.append("gu", gu);
+  for (const code of sources) params.append("src", code);
   const query = params.size > 0 ? `?${params}` : "";
   const res = await fetch(`/api/jobs/map${query}`);
   if (!res.ok) throw new Error(`지도 데이터 요청 실패 (${res.status})`);
@@ -33,7 +37,7 @@ async function requestMapData(districts: readonly SeoulGu[]): Promise<MapData> {
  * 공고가 있는 어린이집을 카카오맵에 마커로 보여 준다. 가까운 마커는 숫자로 묶이고(클러스터), 마커를 누르면 그 공고 카드가 아래에 뜬다.
  * 위치를 찾지 못한 공고는 지도에 없어서 몇 건인지 알려 주고 목록으로 안내한다.
  */
-export function MapView({ appKey, districts, onShowList }: Props) {
+export function MapView({ appKey, districts, sources, onShowList }: Props) {
   const container = useRef<HTMLDivElement>(null);
   const [maps, setMaps] = useState<KakaoMapsApi | null>(null);
   const [data, setData] = useState<MapData | null>(null);
@@ -68,10 +72,10 @@ export function MapView({ appKey, districts, onShowList }: Props) {
     };
   }, [appKey, attempt]);
 
-  // 고른 구가 바뀔 때마다 공고를 새로 받는다. 이전 선택의 늦은 응답은 버린다
+  // 고른 구나 플랫폼이 바뀔 때마다 공고를 새로 받는다. 이전 선택의 늦은 응답은 버린다
   useEffect(() => {
     let cancelled = false;
-    requestMapData(districts)
+    requestMapData(districts, sources)
       .then((next) => {
         if (cancelled) return;
         setData(next);
@@ -84,7 +88,7 @@ export function MapView({ appKey, districts, onShowList }: Props) {
     return () => {
       cancelled = true;
     };
-  }, [districts, attempt]);
+  }, [districts, sources, attempt]);
 
   // 지도와 공고가 모두 준비되면 마커를 새로 찍고, 찍은 곳이 한눈에 보이도록 지도를 맞춘다
   useEffect(() => {

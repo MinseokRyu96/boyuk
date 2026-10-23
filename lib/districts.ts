@@ -41,6 +41,3 @@ export function parseDistricts(values: readonly string[]): SeoulGu[] | null {
   }
   return [...result];
 }
-
-/** 구별 공고 수. total은 구를 모르는 공고까지 합친 전체 수다 */
-export type DistrictCounts = { total: number; byDistrict: Partial<Record<SeoulGu, number>> };

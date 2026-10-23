@@ -22,6 +22,30 @@ export const CRON_SLUGS: Record<string, SourceCode> = {
   samsung: "samsung",
 };
 
+/** 알려진 수집 출처 코드인가 */
+export function isSourceCode(value: string): value is SourceCode {
+  return Object.hasOwn(SOURCES, value);
+}
+
+/**
+ * 주소의 src 파라미터들(같은 이름을 여러 번 쓴다: ?src=samsung&src=hansol)을 검사한다.
+ * 알 수 없는 출처가 하나라도 있으면 null, 아니면 중복을 뺀 목록(비어 있을 수 있다).
+ */
+export function parseSources(values: readonly string[]): SourceCode[] | null {
+  const result = new Set<SourceCode>();
+  for (const value of values) {
+    if (!isSourceCode(value)) return null;
+    result.add(value);
+  }
+  return [...result];
+}
+
+/**
+ * 지금 크론(vercel.json)이 수집하는 출처. 플랫폼 필터에서는 공고가 0건이어도 칩을 보여 줘서
+ * "수집은 하는데 지금 공고가 없는 것"과 "수집하지 않는 것"을 구분한다. 크론을 바꾸면 이 목록도 맞춘다.
+ */
+export const ACTIVE_SOURCES: readonly SourceCode[] = ["seoul_center", "hansol", "purunee", "samsung"];
+
 export function sourceLabel(code: string): string {
   return code in SOURCES ? SOURCES[code as SourceCode].label : code;
 }
