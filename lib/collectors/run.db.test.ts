@@ -197,7 +197,6 @@ describe.skipIf(!enabled)("runCollector — 실제 Supabase DB", () => {
       expect(card?.sources.map((s) => s.code)).toEqual([SRC_A, SRC_B]);
       expect(card?.dDay).toEqual({ label: "D-10", level: "normal" });
       expect(card?.isNew).toBe(true);
-      expect(card?.initial).toBe("테");
       const always = page.cards.find((c) => c.orgName === "테스트푸르니어린이집");
       expect(always?.dDay).toEqual({ label: "상시", level: "open" });
     });

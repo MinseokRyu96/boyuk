@@ -5,9 +5,8 @@ import { Skeleton } from "@seed-design/react";
 /** 불러오는 동안 보여주는 카드 모양 자리표시 (PRD 8장). 실제 카드와 같은 뼈대라 내용이 채워질 때 화면이 흔들리지 않는다 */
 export function SkeletonCard() {
   return (
-    <li aria-hidden="true" className="flex gap-x3 rounded-r4 border border-stroke-neutral-muted bg-bg-layer-default p-x4">
-      <Skeleton radius="full" width="x12" height="x12" className="shrink-0" />
-      <div className="min-w-0 flex-1">
+    <li aria-hidden="true" className="rounded-r4 border border-stroke-neutral-muted bg-bg-layer-default p-x4">
+      <div className="min-w-0">
         <div className="flex items-start justify-between gap-x6">
           <Skeleton radius="8" width="120px" height="lineHeight.t4" />
           <Skeleton radius="8" width="x12" height="x6" />

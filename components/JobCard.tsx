@@ -1,6 +1,5 @@
 import type { DDayLevel } from "@/lib/time";
 import type { FeedCard } from "@/lib/types";
-import { Avatar } from "seed-design/ui/avatar";
 import { Badge } from "seed-design/ui/badge";
 import { TagGroupItem, TagGroupRoot } from "seed-design/ui/tag-group";
 
@@ -21,7 +20,7 @@ const DDAY_BADGE = {
 
 /** 카드 전체가 하나의 링크다. 원문은 새 탭에서 열려 돌아오면 스크롤 위치가 유지된다 (F3) */
 export function JobCard({ card }: { card: FeedCard }) {
-  const { orgName, initial, title, region, dDay, sources, isNew, isWorkplace, url } = card;
+  const { orgName, title, region, dDay, sources, isNew, isWorkplace, url } = card;
   const { extra, ...ddayBadge } = DDAY_BADGE[dDay.level];
 
   return (
@@ -29,11 +28,9 @@ export function JobCard({ card }: { card: FeedCard }) {
       href={url}
       target="_blank"
       rel="noopener noreferrer"
-      className="flex min-h-11 gap-x3 rounded-r4 border border-stroke-neutral-muted bg-bg-layer-default p-x4 transition-colors active:bg-bg-layer-default-pressed focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-stroke-brand-solid"
+      className="block min-h-11 rounded-r4 border border-stroke-neutral-muted bg-bg-layer-default p-x4 transition-colors active:bg-bg-layer-default-pressed focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-stroke-brand-solid"
     >
-      <Avatar size="48" fallback={initial} className="shrink-0" />
-
-      <div className="min-w-0 flex-1">
+      <div className="min-w-0">
         <div className="flex items-start justify-between gap-x2">
           <p className="t4-medium min-w-0 flex-1 truncate pt-x1 text-fg-neutral-muted">{orgName}</p>
           <Badge size="large" {...ddayBadge} className={`shrink-0 ${extra}`}>
