@@ -96,6 +96,17 @@ describe("isTarget — 직무 판별", () => {
     expect(isTarget(job("2026년 하반기 채용", { rawText: "직무: 시설관리 / 신입 가능" }))).toBe(false);
   });
 
+  it("직무 없이 공개채용·공채·정기채용만 적은 글은 교사 채용으로 보고 저장한다", () => {
+    expect(isTarget(job("[서울] 2027학년도 정기 공개채용"))).toBe(true);
+    expect(isTarget(job("[서울강남] 푸르니어린이집 2027 정기공채"))).toBe(true);
+    expect(isTarget(job("2027년도 상반기 교직원 공개채용"))).toBe(true);
+    expect(isTarget(job("2027년도 정기채용"))).toBe(true);
+    // 다른 직무나 대체·보조 교사를 뽑는 공채는 여전히 뺀다
+    expect(isTarget(job("[서울] 원장 공개채용"))).toBe(false);
+    expect(isTarget(job("조리사 정기채용"))).toBe(false);
+    expect(isTarget(job("육아휴직 대체교사 공개채용"))).toBe(false);
+  });
+
   it("담임·보육교사라고 쓰지 않았어도 교사를 구하면 저장한다", () => {
     expect(isTarget(job("어린이집 교사 모집 신입"))).toBe(true);
   });
