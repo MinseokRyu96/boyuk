@@ -17,10 +17,17 @@ export interface KakaoMapInstance {
   setCenter(position: KakaoLatLng): void;
   setLevel(level: number): void;
   panTo(position: KakaoLatLng): void;
+  /** 지도를 화면 픽셀만큼 옮긴다. dy가 양수면 지도 내용이 위로 올라간다 */
+  panBy(dx: number, dy: number): void;
   relayout(): void;
 }
 
 export interface KakaoMarker {
+  setMap(map: KakaoMapInstance | null): void;
+}
+
+/** 지도 위에 띄우는 사용자 정의 내용 (핀 위의 이름표) */
+export interface KakaoCustomOverlay {
   setMap(map: KakaoMapInstance | null): void;
 }
 
@@ -37,6 +44,8 @@ export interface KakaoMapsApi {
   LatLngBounds: new () => KakaoBounds;
   Marker: new (options: { position: KakaoLatLng; title?: string; clickable?: boolean }) => KakaoMarker;
   MarkerClusterer: new (options: { map: KakaoMapInstance; averageCenter?: boolean; minLevel?: number }) => KakaoClusterer;
+  /** yAnchor는 내용의 세로 기준점(0 위, 1 아래). 1이면 내용의 아래 끝이 position에 온다 */
+  CustomOverlay: new (options: { position: KakaoLatLng; content: HTMLElement; yAnchor?: number; zIndex?: number; clickable?: boolean }) => KakaoCustomOverlay;
   event: { addListener(target: object, type: string, handler: () => void): void };
 }
 
