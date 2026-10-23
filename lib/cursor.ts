@@ -2,22 +2,32 @@ import type { FeedRow } from "./types";
 
 export const PAGE_SIZE = 20;
 
-export type Cursor = { at: string; key: string };
+/**
+ * 최신순 커서는 (최초 수집 시각 at, 묶음 키 key) 쌍이다.
+ * 마감일 정렬(임박순·늦은순)의 커서는 마감일 deadline(상시채용이면 null)을 앞에 더한 세 값이다.
+ * deadline이 undefined이면 최신순 커서다.
+ */
+export type Cursor = { at: string; key: string; deadline?: string | null };
 
-/** 커서는 (최초 수집 시각, 묶음 키) 쌍이다. 주소에 넣어도 안전하도록 base64url로 감싼다. */
+/** 주소에 넣어도 안전하도록 base64url로 감싼다. */
 export function encodeCursor(cursor: Cursor): string {
-  return Buffer.from(JSON.stringify([cursor.at, cursor.key]), "utf8").toString("base64url");
+  const values = cursor.deadline === undefined ? [cursor.at, cursor.key] : [cursor.deadline, cursor.at, cursor.key];
+  return Buffer.from(JSON.stringify(values), "utf8").toString("base64url");
 }
 
 /** 형식이 잘못되었으면 null */
 export function decodeCursor(value: string): Cursor | null {
   try {
     const parsed: unknown = JSON.parse(Buffer.from(value, "base64url").toString("utf8"));
-    if (!Array.isArray(parsed) || parsed.length !== 2) return null;
-    const [at, key] = parsed;
+    if (!Array.isArray(parsed) || (parsed.length !== 2 && parsed.length !== 3)) return null;
+    const hasDeadline = parsed.length === 3;
+    const [deadline, at, key] = hasDeadline ? parsed : [undefined, ...parsed];
     if (typeof at !== "string" || typeof key !== "string") return null;
     if (Number.isNaN(Date.parse(at)) || key.length === 0) return null;
-    return { at, key };
+    if (!hasDeadline) return { at, key };
+    // 마감일은 'YYYY-MM-DD'이거나 상시채용을 뜻하는 null이다
+    if (deadline !== null && (typeof deadline !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(deadline))) return null;
+    return { at, key, deadline };
   } catch {
     return null;
   }

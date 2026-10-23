@@ -4,6 +4,7 @@ import { PAGE_SIZE, encodeCursor, paginateRows, type Cursor } from "./cursor";
 import { districtOf, matchesDistricts, type DistrictCounts } from "./districts";
 import { toCard } from "./feed";
 import { buildSampleRows } from "./sample-jobs";
+import { paginateByDeadline, type FeedSort } from "./sort";
 import { getPublicClient } from "./supabase";
 import type { FeedPage, FeedRow } from "./types";
 
@@ -28,6 +29,19 @@ async function rpcFeed(client: SupabaseClient, cursor: Cursor | null, limit: num
 }
 
 const cursorOf = (row: FeedRow): Cursor => ({ at: row.first_seen_at, key: row.group_key });
+
+/** 선택한 구의 공고 전부를 최신순으로 모은다. 훑는 상한(MAX_SCAN_BATCHES × 100건)을 넘는 공고는 빠진다 */
+async function scanAll(client: SupabaseClient, districts: readonly string[]): Promise<FeedRow[]> {
+  const found: FeedRow[] = [];
+  let cursor: Cursor | null = null;
+  for (let batch = 0; batch < MAX_SCAN_BATCHES; batch++) {
+    const rows = await rpcFeed(client, cursor, SCAN_SIZE);
+    for (const row of rows) if (matchesDistricts(row.region, districts)) found.push(row);
+    if (rows.length < SCAN_SIZE) break;
+    cursor = cursorOf(rows[rows.length - 1]);
+  }
+  return found;
+}
 
 /**
  * 구 필터가 걸린 다음 페이지. get_feed는 지역 조건을 받지 못해서(SQL을 바꾸면 마이그레이션을 따로 적용해야 한다),
@@ -68,17 +82,25 @@ async function fetchFilteredPage(
 /**
  * 커서 다음 공고 PAGE_SIZE건. 다음 페이지가 있는지 알기 위해 한 건 더 조회한다.
  * districts(서울의 구)를 주면 그 구의 공고만 돌려준다. 비우면 서울 전체다.
+ * sort가 soon·late(마감 임박순·늦은순)이면 get_feed가 이 순서를 지원하지 않아서(SQL을 바꾸면 마이그레이션을 따로 적용해야 한다)
+ * 공고 전체를 모아 서버에서 정렬한 뒤 잘라 준다. 이때 커서는 마감일을 담은 sort 전용이라 최신순 커서와 섞어 쓰지 않는다.
  */
 export async function fetchFeedPage(
   cursor: Cursor | null,
   now: Date = new Date(),
   districts: readonly string[] = [],
+  sort: FeedSort = "new",
 ): Promise<FeedPage> {
   const client = getPublicClient();
 
   if (!client) {
     const rows = buildSampleRows(now).filter((row) => matchesDistricts(row.region, districts));
-    const page = paginateRows(rows, cursor, PAGE_SIZE);
+    const page = sort === "new" ? paginateRows(rows, cursor, PAGE_SIZE) : paginateByDeadline(rows, cursor, sort, PAGE_SIZE);
+    return { cards: page.rows.map((row) => toCard(row, now)), nextCursor: page.nextCursor };
+  }
+
+  if (sort !== "new") {
+    const page = paginateByDeadline(await scanAll(client, districts), cursor, sort, PAGE_SIZE);
     return { cards: page.rows.map((row) => toCard(row, now)), nextCursor: page.nextCursor };
   }
 

@@ -20,6 +20,19 @@ describe("cursor", () => {
     expect(decodeCursor(encodeCursor(cursor))).toEqual(cursor);
   });
 
+  it("마감일 정렬의 커서는 마감일(상시채용이면 null)까지 담아 다시 읽을 수 있다", () => {
+    const withDate = { at: "2026-10-21T00:00:00.000Z", key: "abc:1", deadline: "2026-11-05" };
+    expect(decodeCursor(encodeCursor(withDate))).toEqual(withDate);
+    const open = { at: "2026-10-21T00:00:00.000Z", key: "abc:1", deadline: null };
+    expect(decodeCursor(encodeCursor(open))).toEqual(open);
+  });
+
+  it("마감일이 날짜 모양이 아닌 세 값짜리 커서는 null", () => {
+    const bad = (values: unknown[]) => Buffer.from(JSON.stringify(values)).toString("base64url");
+    expect(decodeCursor(bad(["내일", "2026-10-21T00:00:00.000Z", "k"]))).toBeNull();
+    expect(decodeCursor(bad([20261105, "2026-10-21T00:00:00.000Z", "k"]))).toBeNull();
+  });
+
   it("잘못된 커서는 null", () => {
     expect(decodeCursor("not-a-cursor")).toBeNull();
     expect(decodeCursor(Buffer.from('["x","y"]').toString("base64url"))).toBeNull();

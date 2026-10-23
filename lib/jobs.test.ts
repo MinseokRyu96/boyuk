@@ -21,7 +21,7 @@ vi.mock("./supabase", () => ({ getPublicClient: () => client }));
 const { fetchDistrictCounts, fetchFeedPage } = await import("./jobs");
 
 /** i번째로 최신인 공고. 구는 guOf(i)로 정한다 */
-function makeRows(count: number, guOf: (i: number) => string | null): FeedRow[] {
+function makeRows(count: number, guOf: (i: number) => string | null, deadlineOf: (i: number) => string | null = () => "2099-12-31"): FeedRow[] {
   return Array.from({ length: count }, (_, i) => {
     const gu = guOf(i);
     return {
@@ -30,7 +30,7 @@ function makeRows(count: number, guOf: (i: number) => string | null): FeedRow[] 
       org_name: `어린이집${i}`,
       region: gu === null ? null : gu === "" ? "서울" : `서울 ${gu}`,
       url: `https://example.com/${i}`,
-      deadline: "2099-12-31",
+      deadline: deadlineOf(i),
       is_workplace: false,
       sources: ["seoul_center"],
       first_seen_at: new Date(Date.UTC(2026, 9, 1) - i * 60_000).toISOString(),
@@ -113,6 +113,62 @@ describe("fetchFeedPage — 구 필터", () => {
   it("DB 오류는 그대로 던진다", async () => {
     client = { rpc: async () => ({ data: null, error: { message: "boom" } }) };
     await expect(fetchFeedPage(null, NOW, ["마포구"])).rejects.toThrow(/boom/);
+  });
+});
+
+describe("fetchFeedPage — 마감일 정렬", () => {
+  /** i번째 공고의 마감일: 2026-11-01부터 하루씩 늦어지고, 5건마다 한 건은 상시채용 */
+  const deadlineOf = (i: number) => (i % 5 === 4 ? null : `2026-11-${String(1 + (i % 28)).padStart(2, "0")}`);
+
+  it("임박순은 공고 전체를 마감일 순으로 정렬해 20건씩 돌려주고, 상시채용은 맨 뒤다", async () => {
+    rows = makeRows(60, () => "마포구", deadlineOf);
+    const first = await fetchFeedPage(null, NOW, [], "soon");
+    expect(first.cards).toHaveLength(20);
+    expect(rpc).toHaveBeenCalledTimes(1); // 60건이라 100건씩 한 번이면 다 모인다
+
+    // 끝까지 이어 읽으면 모든 공고가 한 번씩, 마감일 오름차순(상시채용은 맨 뒤)으로 나온다
+    const seen: string[] = [];
+    let page = first;
+    seen.push(...page.cards.map((card) => card.key));
+    while (page.nextCursor) {
+      page = await fetchFeedPage(decodeCursor(page.nextCursor), NOW, [], "soon");
+      seen.push(...page.cards.map((card) => card.key));
+    }
+    expect(seen).toHaveLength(60);
+    expect(new Set(seen).size).toBe(60);
+    const deadlines = seen.map((key) => rows.find((r) => r.group_key === key)!.deadline);
+    const dated = deadlines.filter((d): d is string => d !== null);
+    expect(dated).toEqual([...dated].sort());
+    expect(deadlines.slice(dated.length).every((d) => d === null)).toBe(true);
+  });
+
+  it("늦은순은 마감일이 늦은 순이다", async () => {
+    rows = makeRows(30, () => "마포구", deadlineOf);
+    const page = await fetchFeedPage(null, NOW, [], "late");
+    const deadlines = page.cards.map((card) => rows.find((r) => r.group_key === card.key)!.deadline).filter((d): d is string => d !== null);
+    expect(deadlines).toEqual([...deadlines].sort().reverse());
+  });
+
+  it("구 필터와 함께 쓰면 선택한 구의 공고만 정렬한다", async () => {
+    rows = makeRows(120, (i) => (i % 2 === 0 ? "마포구" : "은평구"), deadlineOf);
+    const page = await fetchFeedPage(null, NOW, ["은평구"], "soon");
+    expect(page.cards.every((card) => card.region === "서울 은평구")).toBe(true);
+    expect(page.cards).toHaveLength(20);
+    expect(rpc).toHaveBeenCalledTimes(2); // 120건을 100건씩 두 번 모은다
+  });
+
+  it("한 번의 요청이 훑는 상한(1,000건)을 넘는 공고는 정렬 대상에서 빠진다", async () => {
+    rows = makeRows(1200, () => "마포구", deadlineOf);
+    await fetchFeedPage(null, NOW, [], "soon");
+    expect(rpc).toHaveBeenCalledTimes(10);
+  });
+
+  it("Supabase가 없을 때(샘플)도 같은 규칙으로 정렬한다", async () => {
+    client = null;
+    const page = await fetchFeedPage(null, NOW, [], "soon");
+    expect(page.cards).toHaveLength(20);
+    // 마감일 정렬의 커서(마감일을 담은 세 값)로 이어진다. 정렬 규칙 자체는 sort.test.ts가 시험한다
+    expect(decodeCursor(page.nextCursor!)?.deadline).toBeDefined();
   });
 });
 
