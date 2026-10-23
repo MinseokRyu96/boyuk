@@ -4,7 +4,7 @@ import "./globals.css";
 export const metadata: Metadata = {
   title: "보육공고 — 어린이집 신입·담임교사 공고 모아보기",
   description:
-    "고용24, 사람인, 육아종합지원센터, 직장어린이집 공고 중 신입·담임교사 공고만 한곳에 모아 최신순으로 보여줘요.",
+    "서울시 육아종합지원센터와 직장어린이집(한솔·푸르니·삼성·모아맘) 채용 공고 중 서울의 신입·담임교사 공고만 한곳에 모아 보여줘요.",
 };
 
 export const viewport: Viewport = {
