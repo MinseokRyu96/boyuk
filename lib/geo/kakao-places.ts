@@ -9,6 +9,9 @@ import { districtOf } from "../districts";
  *
  * 공고에는 어린이집 이름과 구("서울 마포구")만 있어서 "마포구 가나다어린이집"으로 검색하고,
  * 결과가 정말 그 어린이집인지는 우리가 따로 확인한다 (같은 이름의 다른 지역 어린이집, 전혀 다른 가게가 섞여 나온다).
+ * 카카오는 검색어의 모든 낱말이 맞아야 결과를 주는 듯해서, 이름 표기가 조금만 달라도(예: "서울형"이 붙은 이름, 띄어쓰기) 0건이 나온다.
+ * 그래서 못 찾으면 이름의 알맹이("가나다")로 검색어를 바꿔 다시 찾는다. 2026-10-24에 실제 공고 45곳으로 시험했을 때
+ * 처음 검색만으로 21곳, 변형까지 쓰면 32곳을 찾았다. 나머지는 카카오 지도에 없는 어린이집이다.
  * 이름이 비슷하지 않거나 주소가 해당 구가 아니면 위치를 못 찾은 것으로 한다. 틀린 곳에 핀을 꽂는 것보다 빠지는 편이 낫다.
  */
 
@@ -100,13 +103,28 @@ function firstOrg(orgName: string): string {
   return orgName.split(",")[0].trim();
 }
 
+/**
+ * 찾아볼 검색어를 가능성 높은 순서로 만든다 (중복은 뺀다). 한 어린이집에 호출은 많아야 세 번이다.
+ *  1. "구 어린이집명"           — 이름 그대로
+ *  2. "구 알맹이"               — 설립 형태·법인 표기·끝의 "어린이집"을 뗀 이름 ("마포구 가나다")
+ *  3. "서울 알맹이 어린이집"    — 구를 빼고 서울 전체에서 ("서울 가나다 어린이집")
+ * 알맹이가 두 글자 미만이면 2·3은 엉뚱한 결과만 부르므로 건너뛴다.
+ */
+export function searchQueries(org: string, gu: string | undefined): string[] {
+  const area = gu ?? "서울";
+  const core = placeKey(org);
+  const queries = [`${area} ${org}`];
+  if (core.length >= 2) queries.push(`${area} ${core}`, `서울 ${core} 어린이집`);
+  return [...new Set(queries)];
+}
+
 function explain(status: number): string {
   if (status === 401) return "카카오 REST API 키가 올바르지 않아요. 앱의 REST API 키를 다시 확인해 주세요.";
   if (status === 403) return "카카오 로컬 API 사용이 막혀 있어요. 앱 설정에서 카카오맵(로컬) 사용 설정을 켰는지 확인해 주세요.";
   return "카카오 로컬 API의 호출 한도를 넘었어요. 잠시 뒤에 다시 시도해 주세요.";
 }
 
-/** 카카오 REST API 키로 어린이집 위치를 찾는 함수를 만든다. 한 어린이집에 호출은 많아야 두 번이다 */
+/** 카카오 REST API 키로 어린이집 위치를 찾는 함수를 만든다. 한 어린이집에 호출은 많아야 세 번이다 */
 export function createKakaoPlaceFinder(options: { http: HttpClient; restApiKey: string }): PlaceFinder {
   const { http, restApiKey } = options;
 
@@ -129,9 +147,11 @@ export function createKakaoPlaceFinder(options: { http: HttpClient; restApiKey: 
     if (org === "") return null;
     const gu = districtOf(region);
 
-    // 구를 붙여 먼저 찾고, 못 찾으면 이름만으로 한 번 더 찾는다 (구 표기가 틀렸거나 카카오 지도에 다른 구로 올라 있는 경우)
-    const first = pickPlace(await search(`${gu ?? "서울"} ${org}`), org, region);
-    if (first) return first;
-    return pickPlace(await search(org), org, region);
+    // 이름 그대로 먼저 찾고, 못 찾으면 알맹이로 바꿔 찾는다. 어느 검색어든 결과는 pickPlace의 확인(이름·서울·구)을 통과해야 한다
+    for (const query of searchQueries(org, gu)) {
+      const place = pickPlace(await search(query), org, region);
+      if (place) return place;
+    }
+    return null;
   };
 }

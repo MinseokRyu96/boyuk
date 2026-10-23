@@ -8,6 +8,7 @@ import {
   pickPlace,
   placeKey,
   sameOrg,
+  searchQueries,
   type KakaoDocument,
 } from "./kakao-places";
 
@@ -107,6 +108,21 @@ describe("buildKeywordUrl", () => {
   });
 });
 
+describe("searchQueries", () => {
+  it("이름 그대로, 구 + 알맹이, 서울 + 알맹이 + 어린이집 순서로 만든다", () => {
+    expect(searchQueries("가나다어린이집 서울형", "마포구")).toEqual(["마포구 가나다어린이집 서울형", "마포구 가나다", "서울 가나다 어린이집"]);
+  });
+
+  it("구를 모르면 '서울'을 쓰고, 이름이 곧 알맹이 + 어린이집이어도 중복은 뺀다", () => {
+    expect(searchQueries("가나다어린이집", undefined)).toEqual(["서울 가나다어린이집", "서울 가나다", "서울 가나다 어린이집"]);
+    expect(searchQueries("가나다 어린이집", "마포구")).toEqual(["마포구 가나다 어린이집", "마포구 가나다", "서울 가나다 어린이집"]);
+  });
+
+  it("알맹이가 두 글자 미만이면 이름 그대로만 찾는다", () => {
+    expect(searchQueries("해어린이집", "마포구")).toEqual(["마포구 해어린이집"]);
+  });
+});
+
 describe("createKakaoPlaceFinder", () => {
   it("구를 붙여 한 번 검색해 찾으면 거기서 끝내고, REST API 키를 Authorization 헤더로 보낸다", async () => {
     const { http, get } = fakeHttp([ok({ documents: [doc("가나다어린이집", "서울 마포구 상암동 1")] })]);
@@ -118,15 +134,30 @@ describe("createKakaoPlaceFinder", () => {
     expect(get.mock.calls[0][1]).toEqual({ headers: { Authorization: "KakaoAK TESTKEY" } });
   });
 
-  it("첫 검색에서 못 찾으면 이름만으로 한 번 더 찾고, 그래도 없으면 null (호출은 최대 두 번)", async () => {
+  it("첫 검색에서 못 찾으면 알맹이로 바꿔 다시 찾고, 그래도 없으면 null (호출은 최대 세 번)", async () => {
     const second = fakeHttp([ok({ documents: [] }), ok({ documents: [doc("가나다어린이집", "서울 마포구 1")] })]);
-    expect(await createKakaoPlaceFinder({ http: second.http, restApiKey: "K" })("가나다어린이집", "서울 마포구")).not.toBeNull();
+    expect(await createKakaoPlaceFinder({ http: second.http, restApiKey: "K" })("가나다어린이집 서울형", "서울 마포구")).not.toBeNull();
     expect(second.get).toHaveBeenCalledTimes(2);
-    expect(decodeURIComponent(second.get.mock.calls[1][0])).toContain("query=가나다어린이집&");
+    expect(decodeURIComponent(second.get.mock.calls[1][0])).toContain("query=마포구 가나다&");
 
-    const none = fakeHttp([ok({ documents: [] }), ok({ documents: [] })]);
+    const third = fakeHttp([ok({ documents: [] }), ok({ documents: [] }), ok({ documents: [doc("가나다어린이집", "서울 마포구 1")] })]);
+    expect(await createKakaoPlaceFinder({ http: third.http, restApiKey: "K" })("가나다어린이집", "서울 마포구")).not.toBeNull();
+    expect(third.get).toHaveBeenCalledTimes(3);
+    expect(decodeURIComponent(third.get.mock.calls[2][0])).toContain("query=서울 가나다 어린이집&");
+
+    const none = fakeHttp([ok({ documents: [] }), ok({ documents: [] }), ok({ documents: [] })]);
     expect(await createKakaoPlaceFinder({ http: none.http, restApiKey: "K" })("가나다어린이집", "서울 마포구")).toBeNull();
-    expect(none.get).toHaveBeenCalledTimes(2);
+    expect(none.get).toHaveBeenCalledTimes(3);
+  });
+
+  it("검색 결과가 다른 어린이집이거나 다른 구이면 다음 검색어로 넘어가고 끝내 못 찾으면 null", async () => {
+    const wrong = fakeHttp([
+      ok({ documents: [doc("라마바어린이집", "서울 마포구 1")] }),
+      ok({ documents: [doc("가나다어린이집", "서울 은평구 1")] }),
+      ok({ documents: [] }),
+    ]);
+    expect(await createKakaoPlaceFinder({ http: wrong.http, restApiKey: "K" })("가나다어린이집", "서울 마포구")).toBeNull();
+    expect(wrong.get).toHaveBeenCalledTimes(3);
   });
 
   it("'A, B'처럼 여럿이 이어진 이름은 첫 번째로 찾는다", async () => {
