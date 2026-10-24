@@ -1,18 +1,11 @@
-import { rootCertificates } from "node:tls";
 import { Pool } from "undici";
 import { createHttpClient, type FetchLike } from "./http";
-import { MOAMAM_INTERMEDIATE_CA } from "./moamam-ca";
+import { moamamTlsConnector } from "./moamam-tls";
 
 const ORIGIN = "https://recruit.moamom.com";
 
-// 서버가 보내는 구형 중간 인증서 대신 올바른 발급자 인증서를 보완한다.
-// Node의 기본 루트까지 이어지는 서명·유효기간·호스트 검증은 그대로 유지한다.
-const pool = new Pool(ORIGIN, {
-  connect: {
-    ca: [...rootCertificates, MOAMAM_INTERMEDIATE_CA],
-    rejectUnauthorized: true,
-  },
-});
+// 인증서 보완과 고정한 인증서의 만료 예외는 이 출처의 연결에만 적용한다.
+const pool = new Pool(ORIGIN, { connect: moamamTlsConnector });
 
 export const fetchMoamam: FetchLike = async (input, init) => {
   if (new URL(input).origin !== ORIGIN) {
