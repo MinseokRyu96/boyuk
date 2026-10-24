@@ -4,7 +4,7 @@ import { dedupeKey } from "../dedupe";
 import { isChildcareContext, isTarget } from "../normalize";
 import { geocodeFromEnv } from "../geo/geocode";
 import { getAdminClient } from "../supabase";
-import { TARGET_PROVINCES } from "./config";
+import { EXCLUDED_FACILITY_TYPES, TARGET_PROVINCES } from "./config";
 import { isInTargetRegion } from "./region";
 import type { Collector, RawJob } from "./types";
 
@@ -53,11 +53,16 @@ function toRow(collector: Collector, job: RawJob, seenAt: string): JobRow {
  * 저장 대상인가: 신입·담임 판별을 통과하고, 범용 소스라면 어린이집 맥락도 있어야 하고,
  * 보여 줄 지역(config.ts의 TARGET_PROVINCES, 지금은 서울)의 공고여야 한다. 지역을 모르는 공고는 저장하지 않는다.
  * 단 수집기가 keepOutsideRegion으로 고른 공고는 지역과 상관없이 저장한다.
+ * 민간·가정처럼 빼기로 한 어린이집 유형(config.ts의 EXCLUDED_FACILITY_TYPES)이면 저장하지 않는다.
  */
 function shouldSave(collector: Collector, job: RawJob): boolean {
   const inRegion = isInTargetRegion(job.region, TARGET_PROVINCES) || collector.keepOutsideRegion?.(job) === true;
-  return isTarget(job) && (!collector.needsChildcareContext || isChildcareContext(job)) && inRegion;
+  const excludedType = job.facilityType !== undefined && EXCLUDED_FACILITY_TYPES.includes(job.facilityType);
+  return isTarget(job) && (!collector.needsChildcareContext || isChildcareContext(job)) && inRegion && !excludedType;
 }
+
+/** 한 번에 숨길 source_id 수. 주소 길이가 너무 길어지지 않게 나눠 보낸다 */
+const HIDE_CHUNK = 100;
 
 async function record(db: SupabaseClient, startedAt: Date, result: RunResult): Promise<void> {
   const { error } = await db.from("collector_runs").insert({
@@ -84,7 +89,7 @@ export type RunOptions = {
 };
 
 /**
- * 수집 → 판별 → 중복 키 → upsert → 위치 채우기 → 마감 처리 → 실행 기록 (PRD 6장, 부록 D).
+ * 수집 → 판별 → 중복 키 → upsert → 대상이 아닌 공고 숨기기 → 위치 채우기 → 마감 처리 → 실행 기록 (PRD 6장, 부록 D).
  * 수집기 하나가 던진 오류는 이 함수 안에서 막아 다른 소스에 번지지 않게 한다.
  * db는 시험에서 가짜를 넣을 수 있도록 바꿀 수 있고, 생략하면 service role 클라이언트를 쓴다.
  */
@@ -110,6 +115,19 @@ export async function runCollector(collector: Collector, db: SupabaseClient = ge
     if (rows.size > 0) {
       const { error } = await db.from("jobs").upsert([...rows.values()], { onConflict: "source,source_id" });
       if (error) throw new Error(`jobs 저장 실패: ${error.message}`);
+    }
+
+    // 원문 목록에 있지만 저장 대상이 아닌 공고가 예전 규칙으로 저장돼 있으면 숨긴다.
+    // 판별 규칙을 바꾸면(예: 민간·가정어린이집 제외) 다음 수집부터 기존 행에도 적용된다.
+    const rejected = [...new Set(fetched.map((job) => job.sourceId))].filter((id) => !rows.has(id));
+    for (let i = 0; i < rejected.length; i += HIDE_CHUNK) {
+      const hidden = await db
+        .from("jobs")
+        .update({ is_active: false })
+        .eq("source", collector.source)
+        .eq("is_active", true)
+        .in("source_id", rejected.slice(i, i + HIDE_CHUNK));
+      if (hidden.error) throw new Error(`저장 대상이 아닌 공고 숨기기 실패: ${hidden.error.message}`);
     }
 
     // 위치를 못 채워도 수집은 성공이다. 지도에서만 빠지고 다음 수집에서 다시 시도한다

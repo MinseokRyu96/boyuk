@@ -34,6 +34,7 @@ describe("parseSeoulCenterList — 시험용 축약 목록", () => {
       deadline: "2026-11-07",
       url: "https://seoul.childcare.go.kr/ccef/job/JobOfferSl.jsp?flag=Sl&JOSEQ=9000005",
       rawText: "보육교사",
+      facilityType: "국공립",
       isWorkplace: false,
     });
   });
@@ -43,6 +44,10 @@ describe("parseSeoulCenterList — 시험용 축약 목록", () => {
     expect(byId("9000003")?.title).toBe("차카타병원어린이집 보조 선생님 구인합니다");
     expect(byId("9000006")?.orgName).toBe("가나다어린이집");
     expect(byId("9000003")?.orgName).toBe("차카타병원 어린이집");
+  });
+
+  it("유형 열을 어린이집 유형으로 옮긴다 (민간·가정 제외 판별용)", () => {
+    expect(page.jobs.map((job) => job.facilityType)).toEqual(["가정", "국공립", "국공립", "직장", "직장", "민간"]);
   });
 
   it("유형이 직장인 공고만 직장어린이집으로 표시한다", () => {

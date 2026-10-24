@@ -15,6 +15,8 @@ export type RawJob = {
   careerHint?: "new" | "any" | "experienced";
   /** 공고마다 직장어린이집인지 알 수 있을 때만. 없으면 수집기의 isWorkplace를 따른다 */
   isWorkplace?: boolean;
+  /** 목록이 어린이집 유형(국공립·민간·가정·직장 …)을 줄 때만. 판별에만 쓰고 저장하지 않는다 */
+  facilityType?: string;
 };
 
 /** 수집기 한 번의 결과 */

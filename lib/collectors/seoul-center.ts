@@ -72,6 +72,8 @@ export function parseSeoulCenterList(html: string): SeoulCenterPage {
     // 표에 보이는 글자는 길면 "..."로 잘려서, 전체 제목이 담긴 title 속성을 먼저 쓴다
     const title = clean(link.attr("title")) ?? clean(link.text());
     if (!title) return;
+    // 유형 열: 국공립·사회복지법인·법인·단체등·민간·가정·직장·협동 (검색 폼의 schCrType)
+    const facilityType = clean(cells.eq(1).text());
 
     jobs.push({
       sourceId: id,
@@ -82,8 +84,9 @@ export function parseSeoulCenterList(html: string): SeoulCenterPage {
       url: `${SEOUL_CENTER_DETAIL_URL}?flag=Sl&JOSEQ=${id}`,
       // 신입·직무 판별용. 직종 열의 값(보육교사 등)
       rawText: clean(cells.eq(4).text()),
+      facilityType,
       // 유형 열이 "직장"이면 직장어린이집 공고다
-      isWorkplace: clean(cells.eq(1).text()) === "직장",
+      isWorkplace: facilityType === "직장",
     });
   });
 

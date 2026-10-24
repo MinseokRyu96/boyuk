@@ -7,10 +7,13 @@ vi.mock("server-only", () => ({}));
 const { runCollector } = await import("./run");
 
 /** 호출 내용을 기록하는 가짜 Supabase 클라이언트. 실패를 흉내 낼 수도 있다 */
-function fakeDb(failures: { upsert?: string; gone?: string; rpc?: string; insert?: string } = {}) {
+function fakeDb(failures: { upsert?: string; gone?: string; hide?: string; rpc?: string; insert?: string } = {}) {
   const calls = {
     upserts: [] as { rows: Record<string, unknown>[]; options: unknown }[],
+    // 사라진 공고 숨기기(last_seen_at 기준)
     updates: [] as { values: unknown; filters: unknown[] }[],
+    // 저장 대상이 아닌 공고 숨기기(source_id 목록 기준)
+    hides: [] as { values: unknown; filters: unknown[] }[],
     rpcs: [] as string[],
     runs: [] as Record<string, unknown>[],
   };
@@ -26,6 +29,7 @@ function fakeDb(failures: { upsert?: string; gone?: string; rpc?: string; insert
           return { error: failures.insert ? { message: failures.insert } : null };
         },
         update: (values: unknown) => {
+          const updateValues = values;
           const filters: unknown[] = [];
           const chain = {
             eq: (column: string, value: unknown) => (filters.push(["eq", column, value]), chain),
@@ -33,6 +37,11 @@ function fakeDb(failures: { upsert?: string; gone?: string; rpc?: string; insert
               filters.push(["lt", column, value]);
               calls.updates.push({ values, filters });
               return { error: failures.gone ? { message: failures.gone } : null };
+            },
+            in: async (column: string, values: unknown[]) => {
+              filters.push(["in", column, values]);
+              calls.hides.push({ values: updateValues, filters });
+              return { error: failures.hide ? { message: failures.hide } : null };
             },
           };
           return chain;
@@ -287,6 +296,53 @@ describe("runCollector", () => {
     expect(result).toMatchObject({ status: "success", saved: 0 });
     expect(calls.upserts).toHaveLength(0);
     expect(calls.updates).toHaveLength(1);
+  });
+
+  it("민간·가정어린이집 공고는 저장하지 않고, 예전에 저장된 행이 있으면 숨긴다", async () => {
+    const { db, calls } = fakeDb();
+    const result = await runCollector(
+      collectorOf({
+        complete: false,
+        jobs: [
+          job("public", "신입 담임교사", { facilityType: "국공립" }),
+          job("private", "신입 담임교사", { facilityType: "민간" }),
+          job("home", "신입 담임교사", { facilityType: "가정" }),
+          job("workplace", "신입 담임교사", { facilityType: "직장" }),
+          job("unknown", "신입 담임교사"),
+          job("cook", "조리원 모집 경력무관", { facilityType: "국공립" }),
+        ],
+      }),
+      db,
+    );
+
+    expect(result).toMatchObject({ status: "success", fetched: 6, saved: 3 });
+    expect(calls.upserts[0].rows.map((row) => row.source_id)).toEqual(["public", "workplace", "unknown"]);
+    // 일부만 읽은 소스여도 목록에 있는 공고는 확실히 판별했으므로 숨긴다
+    expect(calls.hides).toEqual([
+      {
+        values: { is_active: false },
+        filters: [
+          ["eq", "source", "work24"],
+          ["eq", "is_active", true],
+          ["in", "source_id", ["private", "home", "cook"]],
+        ],
+      },
+    ]);
+  });
+
+  it("저장 대상이 아닌 공고가 많으면 나눠서 숨긴다", async () => {
+    const { db, calls } = fakeDb();
+    const jobs = Array.from({ length: 250 }, (_, i) => job(String(i), "신입 담임교사", { facilityType: "가정" }));
+    await runCollector(collectorOf({ complete: false, jobs }), db);
+    expect(calls.hides.map((hide) => (hide.filters[2] as [string, string, string[]])[2].length)).toEqual([100, 100, 50]);
+  });
+
+  it("저장 대상이 아닌 공고를 숨기지 못하면 실패로 기록한다", async () => {
+    const { db, calls } = fakeDb({ hide: "permission denied" });
+    const result = await runCollector(collectorOf({ complete: true, jobs: [job("1", "신입 담임교사", { facilityType: "민간" })] }), db);
+    expect(result.status).toBe("failed");
+    expect(result.error).toContain("숨기기 실패");
+    expect(calls.updates).toHaveLength(0);
   });
 
   it("실행 기록이 실패해도 수집 결과는 그대로 돌려준다", async () => {

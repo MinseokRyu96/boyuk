@@ -256,6 +256,20 @@ describe.skipIf(!enabled)("runCollector — 실제 Supabase DB", () => {
       expect(byId(a, "a5")?.is_active).toBe(false);
       expect(a.map((row) => row.source_id)).toEqual(["a1", "a2", "a4", "a5"]);
     });
+
+    it("저장돼 있던 공고(a1)가 민간어린이집으로 다시 나오면 일부만 가져온 실행이어도 숨기고, 목록에 없는 a2는 그대로 둔다", async () => {
+      const result = await runCollector(
+        fake(SRC_A, {
+          complete: false,
+          jobs: [job(SRC_A, "a1", "[신입 가능] 만 1세반 담임교사 (itest)", { orgName: MERGED_ORG, deadline: day(10), facilityType: "민간" })],
+        }),
+        admin,
+      );
+      expect(result).toMatchObject({ status: "success", saved: 0 });
+      const a = await jobsOf(SRC_A);
+      expect(byId(a, "a1")?.is_active).toBe(false);
+      expect(byId(a, "a2")?.is_active).toBe(true);
+    });
   });
 
   describe("실패 처리", () => {
