@@ -153,6 +153,15 @@ export function Feed({ initial, counts, mapKey }: Props) {
     if (saved.length > 0) changeView({ districts: saved, sources: [], sort: "new" });
   }, [changeView]);
 
+  // 지도 보기에서는 하단 설명(Footer)을 숨긴다. Footer는 페이지(서버 컴포넌트)에 있어서 문서 맨 위에 보기 방식을 표시해 CSS로 가린다
+  useEffect(() => {
+    const root = document.documentElement;
+    root.dataset.view = mapKey && view === "map" ? "map" : "list";
+    return () => {
+      delete root.dataset.view;
+    };
+  }, [mapKey, view]);
+
   // 목록 끝 근처에 닿으면 다음 페이지를 요청한다. 오류가 나면 관찰을 멈춰 같은 요청이 반복되지 않게 한다.
   useEffect(() => {
     const node = sentinel.current;

@@ -24,7 +24,16 @@ export interface KakaoMapInstance {
 
 export interface KakaoMarker {
   setMap(map: KakaoMapInstance | null): void;
+  /** 핀 그림을 바꾼다 (고른 핀을 크게 보여 줄 때) */
+  setImage(image: KakaoMarkerImage): void;
+  /** 겹칠 때 위에 그릴 순서. 클수록 위 */
+  setZIndex(zIndex: number): void;
 }
+
+/** 핀 그림. offset은 그림 안에서 위치를 가리키는 점(물방울 핀이면 아래 가운데)이다 */
+export type KakaoMarkerImage = object;
+export type KakaoSize = object;
+export type KakaoPoint = object;
 
 /** 지도 위에 띄우는 사용자 정의 내용 (핀 위의 이름표) */
 export interface KakaoCustomOverlay {
@@ -42,8 +51,21 @@ export interface KakaoMapsApi {
   Map: new (container: HTMLElement, options: { center: KakaoLatLng; level: number }) => KakaoMapInstance;
   LatLng: new (lat: number, lng: number) => KakaoLatLng;
   LatLngBounds: new () => KakaoBounds;
-  Marker: new (options: { position: KakaoLatLng; title?: string; clickable?: boolean }) => KakaoMarker;
-  MarkerClusterer: new (options: { map: KakaoMapInstance; averageCenter?: boolean; minLevel?: number }) => KakaoClusterer;
+  Size: new (width: number, height: number) => KakaoSize;
+  Point: new (x: number, y: number) => KakaoPoint;
+  MarkerImage: new (src: string, size: KakaoSize, options?: { offset?: KakaoPoint }) => KakaoMarkerImage;
+  Marker: new (options: { position: KakaoLatLng; title?: string; clickable?: boolean; image?: KakaoMarkerImage; zIndex?: number }) => KakaoMarker;
+  /**
+   * styles는 클러스터 원의 CSS(단계마다 하나), calculator는 단계를 나누는 묶인 핀 수의 경계값이다.
+   * 경계값이 [10, 30]이면 10 미만·30 미만·그 이상에 styles[0]·[1]·[2]를 쓴다.
+   */
+  MarkerClusterer: new (options: {
+    map: KakaoMapInstance;
+    averageCenter?: boolean;
+    minLevel?: number;
+    styles?: Record<string, string>[];
+    calculator?: number[];
+  }) => KakaoClusterer;
   /** yAnchor는 내용의 세로 기준점(0 위, 1 아래). 1이면 내용의 아래 끝이 position에 온다 */
   CustomOverlay: new (options: { position: KakaoLatLng; content: HTMLElement; yAnchor?: number; zIndex?: number; clickable?: boolean }) => KakaoCustomOverlay;
   event: { addListener(target: object, type: string, handler: () => void): void };

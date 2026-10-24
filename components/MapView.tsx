@@ -5,7 +5,16 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { ActionButton } from "seed-design/ui/action-button";
 import type { SeoulGu } from "@/lib/districts";
 import type { SourceCode } from "@/lib/sources";
-import { loadKakaoMaps, type KakaoClusterer, type KakaoCustomOverlay, type KakaoMapInstance, type KakaoMapsApi, type KakaoMarker } from "@/lib/kakao-sdk";
+import {
+  loadKakaoMaps,
+  type KakaoClusterer,
+  type KakaoCustomOverlay,
+  type KakaoMapInstance,
+  type KakaoMapsApi,
+  type KakaoMarker,
+  type KakaoMarkerImage,
+} from "@/lib/kakao-sdk";
+import { CLUSTER_CALCULATOR, CLUSTER_STYLES, PIN_SELECTED_SIZE, PIN_SIZE, pinImageSrc } from "@/lib/map-pin";
 import { groupPlaces, type MapPlace } from "@/lib/map-places";
 import type { MapData } from "@/lib/types";
 import { JobCard } from "./JobCard";
@@ -22,8 +31,8 @@ type Props = {
   onShowList: () => void;
 };
 
-/** 핀 위에 띄우는 이름표의 모양. 핀(약 40px) 위로 띄우려고 아래에 여백을 두고, 지도 조작을 막지 않게 누를 수 없게 한다 */
-const LABEL_WRAPPER_CLASS = "pointer-events-none pb-[44px]";
+/** 핀 위에 띄우는 이름표의 모양. 고른 핀(높이 52px) 위로 띄우려고 아래에 여백을 두고, 지도 조작을 막지 않게 누를 수 없게 한다 */
+const LABEL_WRAPPER_CLASS = "pointer-events-none pb-[56px]";
 const LABEL_CLASS = "t4-bold max-w-[220px] truncate rounded-full border border-stroke-neutral-muted bg-bg-layer-default px-x3 py-x1 text-fg-neutral shadow-[0_2px_6px_rgba(0,0,0,0.18)]";
 
 function labelElement(text: string): HTMLElement {
@@ -53,6 +62,20 @@ const MY_LOCATION_LEVEL = 5;
 function locationErrorMessage(error: GeolocationPositionError): string {
   if (error.code === error.PERMISSION_DENIED) return "위치 권한이 꺼져 있어요. 브라우저 설정에서 이 사이트의 위치 권한을 허용해 주세요.";
   return "현재 위치를 찾지 못했어요. 잠시 후 다시 시도해 주세요.";
+}
+
+/** 핀 그림은 (건수, 고름) 조합마다 한 번만 만든다 */
+const pinImages = new Map<string, KakaoMarkerImage>();
+
+function pinImage(maps: KakaoMapsApi, count: number, selected: boolean): KakaoMarkerImage {
+  const key = `${Math.min(count, 10)}:${selected}`;
+  const cached = pinImages.get(key);
+  if (cached) return cached;
+  const { width, height } = selected ? PIN_SELECTED_SIZE : PIN_SIZE;
+  // 핀 끝(그림 아래 가운데)이 어린이집 위치를 가리킨다
+  const image = new maps.MarkerImage(pinImageSrc(count, selected), new maps.Size(width, height), { offset: new maps.Point(width / 2, height) });
+  pinImages.set(key, image);
+  return image;
 }
 
 /** 서울시청 근처. 찍을 공고가 없을 때의 지도 중심 */
@@ -86,6 +109,8 @@ export function MapView({ appKey, districts, sources, onShowList }: Props) {
   const clusterer = useRef<KakaoClusterer | null>(null);
   const label = useRef<KakaoCustomOverlay | null>(null);
   const myLocation = useRef<KakaoCustomOverlay | null>(null);
+  /** 자리(MapPlace.key)별 핀. 고른 핀만 그림을 바꾸는 데 쓴다 */
+  const markers = useRef(new Map<string, { marker: KakaoMarker; count: number }>());
   const [locating, setLocating] = useState(false);
   const [locationError, setLocationError] = useState<string | null>(null);
 
@@ -97,7 +122,14 @@ export function MapView({ appKey, districts, sources, onShowList }: Props) {
         if (cancelled || !container.current) return;
         map.current = new api.Map(container.current, { center: new api.LatLng(SEOUL_CENTER.lat, SEOUL_CENTER.lng), level: 8 });
         // 서울 전체를 볼 때(레벨 9, 축척 4km 이상)만 숫자로 묶고, 구 하나를 볼 만큼(축척 2km 이하) 확대하면 핀을 하나씩 보여 준다
-        clusterer.current = new api.MarkerClusterer({ map: map.current, averageCenter: true, minLevel: 9 });
+        // 원의 모양은 lib/map-pin.ts(흰 테두리 청록 원, 묶인 수가 많을수록 크다)
+        clusterer.current = new api.MarkerClusterer({
+          map: map.current,
+          averageCenter: true,
+          minLevel: 9,
+          styles: CLUSTER_STYLES,
+          calculator: CLUSTER_CALCULATOR,
+        });
         api.event.addListener(map.current, "click", () => setSelected(null));
         setMaps(api);
       })
@@ -138,13 +170,21 @@ export function MapView({ appKey, districts, sources, onShowList }: Props) {
   // 지도와 공고가 모두 준비되면 어린이집마다 핀을 새로 찍고, 찍은 곳이 한눈에 보이도록 지도를 맞춘다
   useEffect(() => {
     if (!maps || !data || !map.current || !clusterer.current) return;
-    const markers: KakaoMarker[] = groupPlaces(data.points).map((place) => {
-      const marker = new maps.Marker({ position: new maps.LatLng(place.lat, place.lng), title: place.name, clickable: true });
+    markers.current.clear();
+    const created: KakaoMarker[] = groupPlaces(data.points).map((place) => {
+      const count = place.points.length;
+      const marker = new maps.Marker({
+        position: new maps.LatLng(place.lat, place.lng),
+        title: count > 1 ? `${place.name}, 공고 ${count}건` : place.name,
+        clickable: true,
+        image: pinImage(maps, count, false),
+      });
       maps.event.addListener(marker, "click", () => setSelected(place));
+      markers.current.set(place.key, { marker, count });
       return marker;
     });
     clusterer.current.clear();
-    clusterer.current.addMarkers(markers);
+    clusterer.current.addMarkers(created);
 
     if (data.points.length > 0) {
       const bounds = new maps.LatLngBounds();
@@ -155,6 +195,19 @@ export function MapView({ appKey, districts, sources, onShowList }: Props) {
       map.current.setLevel(8);
     }
   }, [maps, data]);
+
+  // 고른 핀을 크고 진하게 바꾸고 맨 위로 올린다. 고른 것이 바뀌거나 풀리면 원래 그림으로 되돌린다
+  useEffect(() => {
+    if (!maps || !selected) return;
+    const entry = markers.current.get(selected.key);
+    if (!entry) return;
+    entry.marker.setImage(pinImage(maps, entry.count, true));
+    entry.marker.setZIndex(2);
+    return () => {
+      entry.marker.setImage(pinImage(maps, entry.count, false));
+      entry.marker.setZIndex(0);
+    };
+  }, [maps, data, selected]);
 
   // 고른 핀 위에 어린이집 이름을 띄우고, 그 자리로 지도를 옮긴다
   useEffect(() => {
@@ -229,13 +282,14 @@ export function MapView({ appKey, districts, sources, onShowList }: Props) {
   const unlocated = data ? data.total - data.points.length : 0;
 
   return (
-    <div className="px-x4 pb-x6 pt-x3">
+    // 지도는 좌우 여백 없이 화면 폭을 다 쓰고, 높이도 화면의 72%까지 키웠다(지도 보기에서는 하단 설명을 숨겨 그 자리를 지도에 준다)
+    <div className="pb-x6 pt-x3">
       <div className="relative">
         <div
           ref={container}
           role="region"
           aria-label="공고가 있는 어린이집 위치 지도"
-          className="h-[56dvh] min-h-[320px] w-full overflow-hidden rounded-r4 border border-stroke-neutral-muted bg-bg-neutral-weak"
+          className="h-[72dvh] min-h-[360px] w-full overflow-hidden border-y border-stroke-neutral-muted bg-bg-neutral-weak"
         />
 
         {maps && (
@@ -291,11 +345,11 @@ export function MapView({ appKey, districts, sources, onShowList }: Props) {
       </p>
 
       {data && data.total > 0 && data.points.length === 0 && (
-        <p className="t4-regular mt-x3 text-fg-neutral-muted">아직 위치를 찾은 공고가 없어요. 위치는 새 공고를 수집할 때마다 조금씩 채워져요.</p>
+        <p className="t4-regular mx-x4 mt-x3 text-fg-neutral-muted">아직 위치를 찾은 공고가 없어요. 위치는 새 공고를 수집할 때마다 조금씩 채워져요.</p>
       )}
 
       {unlocated > 0 && data && data.points.length > 0 && (
-        <div className="mt-x3 flex items-center justify-between gap-x3 rounded-r4 bg-bg-neutral-weak p-x3">
+        <div className="mx-x4 mt-x3 flex items-center justify-between gap-x3 rounded-r4 bg-bg-neutral-weak p-x3">
           <p className="t4-regular text-fg-neutral-muted">위치를 찾지 못한 공고 {unlocated}건은 지도에 없어요.</p>
           <ActionButton variant="neutralWeak" size="large" onClick={onShowList} className="shrink-0">
             목록 보기
