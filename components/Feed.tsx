@@ -1,5 +1,6 @@
 "use client";
 
+import { IconChevronDownLine } from "@karrotmarket/react-monochrome-icon";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { SegmentedControl, SegmentedControlItem } from "seed-design/ui/segmented-control";
 import { readSavedDistricts, saveDistricts } from "@/lib/district-storage";
@@ -196,19 +197,27 @@ export function Feed({ initial, counts, mapKey }: Props) {
         <MapView appKey={mapKey} districts={selected} sources={sources} onShowList={() => setView("list")} />
       ) : (
         <>
-          <div className="px-x4 pt-x3">
-            <SegmentedControl aria-label="공고 정렬" value={sort} onValueChange={changeSort} style={{ width: "100%" }}>
-              {FEED_SORTS.map((order) => (
-                <SegmentedControlItem key={order} value={order}>
-                  {SORT_LABELS[order]}
-                </SegmentedControlItem>
-              ))}
-            </SegmentedControl>
-          </div>
-
-          <div className="flex items-baseline justify-between px-x4 pt-x5">
-            <h2 className="t6-bold text-fg-neutral">{HEADINGS[sort]}</h2>
-            <span className="t4-regular text-fg-neutral-muted">{shownCount === null ? " " : `${shownCount}건`}</span>
+          {/* 정렬은 목록 제목 오른쪽의 드롭다운이다. 건수는 제목 옆에 둔다 */}
+          <div className="flex items-center justify-between gap-x2 pl-x4 pr-x2 pt-x4">
+            <h2 className="t6-bold min-w-0 truncate text-fg-neutral">
+              {HEADINGS[sort]}
+              {shownCount !== null && <span className="t4-regular ml-x2 text-fg-neutral-muted">{shownCount}건</span>}
+            </h2>
+            <div className="relative flex shrink-0 items-center">
+              <select
+                aria-label="공고 정렬"
+                value={sort}
+                onChange={(event) => changeSort(event.target.value)}
+                className="t4-medium min-h-11 cursor-pointer appearance-none rounded-r2 bg-transparent pl-x2 pr-x7 text-right text-fg-neutral [text-align-last:right] focus-visible:outline-2 focus-visible:outline-stroke-brand-solid"
+              >
+                {FEED_SORTS.map((order) => (
+                  <option key={order} value={order}>
+                    {SORT_LABELS[order]}
+                  </option>
+                ))}
+              </select>
+              <IconChevronDownLine aria-hidden="true" className="pointer-events-none absolute right-2 size-4 text-fg-neutral-muted" />
+            </div>
           </div>
 
           {failedWithoutCards ? (
