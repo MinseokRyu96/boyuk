@@ -4,7 +4,14 @@ import { describe, expect, it, vi } from "vitest";
 import { isTarget } from "../normalize";
 import { HttpError, type HttpClient, type HttpResponse } from "./http";
 import { CrawlNotAllowedError } from "./robots";
-import { SamsungError, buildSamsungUrl, createSamsungCollector, parseSamsungContactRegion, parseSamsungList } from "./samsung";
+import {
+  SamsungError,
+  buildSamsungUrl,
+  createSamsungCollector,
+  isRegularHomeroom,
+  parseSamsungContactRegion,
+  parseSamsungList,
+} from "./samsung";
 
 const LIST_HTML = readFileSync(join(__dirname, "__fixtures__/samsung-list.html"), "utf8");
 
@@ -66,12 +73,27 @@ describe("parseSamsungList — 예외", () => {
 });
 
 describe("parseSamsungContactRegion", () => {
-  it("연락처가 02로 시작하면 서울, 다른 지역번호나 연락처 없음은 알 수 없음", () => {
+  it("연락처의 지역번호로 시·도를 읽고, 휴대전화나 연락처 없음은 알 수 없음", () => {
     expect(parseSamsungContactRegion("<th>연락처</th><td>02-1234-5678</td>")).toBe("서울");
     expect(parseSamsungContactRegion("<th>연락처</th><td>(02) 123-4567</td>")).toBe("서울");
-    expect(parseSamsungContactRegion("<th>연락처</th><td>031-218-2935</td>")).toBeUndefined();
+    expect(parseSamsungContactRegion("<th>연락처</th><td>031-218-2935</td>")).toBe("경기");
+    expect(parseSamsungContactRegion("<th>연락처</th><td>032-123-4567</td>")).toBe("인천");
+    expect(parseSamsungContactRegion("<th>연락처</th><td>010-1234-5678</td>")).toBeUndefined();
     expect(parseSamsungContactRegion("<th>접수처</th><td>test@example.com</td>")).toBeUndefined();
     expect(parseSamsungContactRegion("")).toBeUndefined();
+  });
+});
+
+describe("isRegularHomeroom", () => {
+  const raw = (title: string) => ({ sourceId: "1", title, url: "https://example.com/1" });
+
+  it("직종에 정규직과 담임이 함께 있어야 서울 밖 공고도 보여 준다", () => {
+    expect(isRegularHomeroom(raw("보육교사(27학년도 정규직 담임교사)"))).toBe(true);
+    expect(isRegularHomeroom(raw("정규직 담임 보육교사"))).toBe(true);
+    expect(isRegularHomeroom(raw("보육교사"))).toBe(false);
+    expect(isRegularHomeroom(raw("보육교사(11월 임용)"))).toBe(false);
+    expect(isRegularHomeroom(raw("보육교사(정규직 비담임)"))).toBe(false);
+    expect(isRegularHomeroom(raw("담임교사(계약직)"))).toBe(false);
   });
 });
 
@@ -182,13 +204,20 @@ describe("createSamsungCollector", () => {
     expect(get).toHaveBeenCalledTimes(1);
   });
 
-  it("지역을 모르는 신입·담임 후보는 상세의 연락처 지역번호가 02일 때만 서울로 본다", async () => {
+  it("지역을 모르는 신입·담임 후보는 상세의 연락처 지역번호로 시·도를 정한다", async () => {
     const detail: Route = (url) => detailOf(url.searchParams.get("seq") === "100" ? "02-1234-5678" : "031-218-2935");
     const { http, get } = fakeHttp(() => ok(listHtml(1, 1, 2, 100, 2)), detail);
     const result = await createSamsungCollector({ http, ignoreRobotsTxt: true }).fetchJobs();
 
     expect(detailCalls(get).map((url) => url.searchParams.get("seq"))).toEqual(["100", "101"]);
-    expect(result.jobs.map((job) => job.region)).toEqual(["서울", undefined]);
+    expect(result.jobs.map((job) => job.region)).toEqual(["서울", "경기"]);
+  });
+
+  it("정규직 담임 공고는 서울 밖이어도 저장하도록 실행기에 알린다", () => {
+    const { http } = fakeHttp(() => ok(listHtml(1, 1, 1, 100, 1)));
+    const collector = createSamsungCollector({ http, ignoreRobotsTxt: true });
+    expect(collector.keepOutsideRegion?.({ sourceId: "1", title: "보육교사(정규직 담임교사)", url: "https://example.com/1" })).toBe(true);
+    expect(collector.keepOutsideRegion?.({ sourceId: "1", title: "보육교사", url: "https://example.com/1" })).toBe(false);
   });
 
   it("후보가 아닌 공고(대체교사)는 상세를 요청하지 않는다", async () => {

@@ -120,6 +120,28 @@ describe("runCollector", () => {
     expect(calls.upserts[0].rows.map((row) => row.source_id)).toEqual(["seoul", "seoul-only"]);
   });
 
+  it("수집기가 keepOutsideRegion으로 고른 공고는 서울 밖이어도 저장하되, 신입·담임 판별은 그대로 거친다", async () => {
+    const { db, calls } = fakeDb();
+    const result = await runCollector(
+      collectorOf(
+        {
+          complete: true,
+          jobs: [
+            job("regular", "보육교사(정규직 담임교사)", { region: "인천" }),
+            job("regular-unknown", "보육교사(정규직 담임교사)", { region: undefined }),
+            job("contract", "보육교사(계약직)", { region: "경기" }),
+            job("cook", "조리사(정규직)", { region: "경기" }),
+          ],
+        },
+        { keepOutsideRegion: (raw) => raw.title.includes("정규직") },
+      ),
+      db,
+    );
+
+    expect(result).toMatchObject({ fetched: 4, saved: 2 });
+    expect(calls.upserts[0].rows.map((row) => row.source_id)).toEqual(["regular", "regular-unknown"]);
+  });
+
   it("공고를 저장한 뒤 사라진 공고를 숨기기 전에 위치를 채운다", async () => {
     const { db, calls } = fakeDb();
     let upsertsWhenCalled = -1;

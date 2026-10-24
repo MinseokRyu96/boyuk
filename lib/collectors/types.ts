@@ -43,5 +43,10 @@ export interface Collector {
    * 생략하면 구현된 것으로 본다.
    */
   implemented?: boolean;
+  /**
+   * 보여 줄 지역(config.ts의 TARGET_PROVINCES) 밖이거나 지역을 몰라도 저장할 공고면 true를 돌려준다.
+   * 신입·담임 판별은 그대로 거친다. 생략하면 지역 조건을 모든 공고에 건다 (예: 삼성은 정규직 담임 공고만 전국을 보여 준다)
+   */
+  keepOutsideRegion?: (job: RawJob) => boolean;
   fetchJobs(): Promise<CollectResult>;
 }

@@ -52,9 +52,11 @@ function toRow(collector: Collector, job: RawJob, seenAt: string): JobRow {
 /**
  * 저장 대상인가: 신입·담임 판별을 통과하고, 범용 소스라면 어린이집 맥락도 있어야 하고,
  * 보여 줄 지역(config.ts의 TARGET_PROVINCES, 지금은 서울)의 공고여야 한다. 지역을 모르는 공고는 저장하지 않는다.
+ * 단 수집기가 keepOutsideRegion으로 고른 공고는 지역과 상관없이 저장한다.
  */
 function shouldSave(collector: Collector, job: RawJob): boolean {
-  return isTarget(job) && (!collector.needsChildcareContext || isChildcareContext(job)) && isInTargetRegion(job.region, TARGET_PROVINCES);
+  const inRegion = isInTargetRegion(job.region, TARGET_PROVINCES) || collector.keepOutsideRegion?.(job) === true;
+  return isTarget(job) && (!collector.needsChildcareContext || isChildcareContext(job)) && inRegion;
 }
 
 async function record(db: SupabaseClient, startedAt: Date, result: RunResult): Promise<void> {
